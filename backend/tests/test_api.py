@@ -73,6 +73,50 @@ def register_and_create_home(client: TestClient) -> tuple[dict, dict]:
     return household, rate_response.json()
 
 
+def test_empty_or_inactive_household_usage_does_not_create_bill(client):
+    test_client, _ = client
+    household, _ = register_and_create_home(test_client)
+    household_id = household["household_id"]
+
+    empty_calculation = test_client.post(
+        f"/api/households/{household_id}/calculate", json={}
+    )
+    assert empty_calculation.status_code == 200, empty_calculation.text
+    assert empty_calculation.json()["has_usage"] is False
+    assert empty_calculation.json()["current_kwh"] == 0
+    assert empty_calculation.json()["estimated_cost"] == 0
+    assert empty_calculation.json()["bill_id"] is None
+    assert test_client.get(f"/api/households/{household_id}/bills").json() == []
+
+    appliance_response = test_client.post(
+        f"/api/households/{household_id}/appliances",
+        json={"appliance_name": "Fan", "category": "Cooling", "wattage": 100, "quantity": 1},
+    )
+    assert appliance_response.status_code == 201, appliance_response.text
+    appliance_id = appliance_response.json()["appliance_id"]
+    schedule_response = test_client.post(
+        f"/api/appliances/{appliance_id}/schedules",
+        json={
+            "days_of_week": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            "hours_per_day": 1,
+            "is_active": False,
+        },
+    )
+    assert schedule_response.status_code == 201, schedule_response.text
+
+    inactive_calculation = test_client.post(
+        f"/api/households/{household_id}/calculate", json={}
+    )
+    assert inactive_calculation.status_code == 200, inactive_calculation.text
+    assert inactive_calculation.json()["has_usage"] is False
+    assert inactive_calculation.json()["bill_id"] is None
+    assert test_client.get(f"/api/households/{household_id}/bills").json() == []
+
+    dashboard = test_client.get(f"/api/households/{household_id}/dashboard")
+    assert dashboard.status_code == 200, dashboard.text
+    assert dashboard.json()["has_usage"] is False
+
+
 def test_setting_rate_updates_period_saved_with_placeholder_rate(client):
     test_client, _ = client
     token = create_account(test_client, "new-home@example.com")
@@ -353,6 +397,16 @@ def test_historical_appliance_is_archived_and_cannot_be_crossed_by_another_user(
     assert test_client.get(f"/api/households/{household_id}/appliances").json() == []
     saved_bill = test_client.get(f"/api/households/{household_id}/bills").json()[0]
     assert saved_bill["total_kwh"] > 0
+    no_active_appliance_estimate = test_client.post(
+        f"/api/households/{household_id}/calculate", json={}
+    )
+    assert no_active_appliance_estimate.status_code == 200
+    assert no_active_appliance_estimate.json()["has_usage"] is False
+    assert no_active_appliance_estimate.json()["current_kwh"] == saved_bill["total_kwh"]
+    assert test_client.get(f"/api/households/{household_id}/bills").json()[0]["total_kwh"] == (
+        saved_bill["total_kwh"]
+    )
+    assert test_client.get(f"/api/households/{household_id}/dashboard").json()["has_usage"] is False
 
     unused_appliance = test_client.post(
         f"/api/households/{household_id}/appliances",

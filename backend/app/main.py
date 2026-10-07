@@ -26,6 +26,7 @@ from sqlalchemy import (
     String,
     Time,
     create_engine,
+    or_,
     select,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
@@ -530,7 +531,9 @@ def stored_total_for_period(db: Session, household: Household, start: date, end:
     return sum((Decimal(record.estimated_kwh or 0) for record in records), Decimal(0))
 
 
-def bill_for_period(db: Session, household: Household, start: date, end: date) -> BillingRecord:
+def bill_for_period(
+    db: Session, household: Household, start: date, end: date
+) -> BillingRecord | None:
     total = stored_total_for_period(db, household, start, end)
     bill = db.scalar(
         select(BillingRecord).where(
@@ -539,6 +542,9 @@ def bill_for_period(db: Session, household: Household, start: date, end: date) -
             BillingRecord.period_end == end,
         )
     )
+    if total <= 0 and bill is None:
+        return None
+
     current_start, current_end = get_period(None, None)
     is_current_period = start == current_start and end == current_end
     rate_id = bill.rate_id if bill is not None else household.rate_id
@@ -585,6 +591,7 @@ def calculate_period(
     end: date,
 ) -> dict:
     period_days = (end - start).days + 1
+    scheduled_total = Decimal(0)
     appliances = list(
         db.scalars(
             select(Appliance).where(
@@ -595,6 +602,7 @@ def calculate_period(
     )
     for appliance in appliances:
         kwh = projected_kwh(appliance, average_daily_hours(db, appliance.appliance_id), period_days)
+        scheduled_total += money(kwh)
         record = db.scalar(
             select(ConsumptionRecord).where(
                 ConsumptionRecord.appliance_id == appliance.appliance_id,
@@ -616,6 +624,24 @@ def calculate_period(
             record.calculated_at = utc_now()
     db.flush()
     bill = bill_for_period(db, household, start, end)
+    if bill is None:
+        rate = db.get(ElectricityRate, household.rate_id)
+        if rate is None:
+            raise HTTPException(
+                status_code=409, detail="Choose an electricity provider before calculating a bill."
+            )
+        db.commit()
+        return {
+            "bill_id": None,
+            "period_start": start,
+            "period_end": end,
+            "current_kwh": 0,
+            "estimated_cost": 0,
+            "rate_per_kwh": float(rate.rate_per_kwh),
+            "provider_name": rate.provider_name,
+            "has_usage": False,
+        }
+
     db.flush()
     rate = db.get(ElectricityRate, bill.rate_id)
     db.commit()
@@ -628,6 +654,11 @@ def calculate_period(
         "estimated_cost": float(bill.estimated_cost or 0),
         "rate_per_kwh": float(rate.rate_per_kwh),
         "provider_name": rate.provider_name,
+        "has_usage": (
+            scheduled_total > 0
+            if (start, end) == get_period(None, None)
+            else Decimal(bill.total_kwh or 0) > 0
+        ),
     }
 
 
@@ -1154,10 +1185,12 @@ def household_dashboard(
     )
     period_days = (end - start).days + 1
     tops = []
+    active_total = Decimal(0)
     daily_kwh_by_weekday = [Decimal(0)] * 7
     for appliance in appliances:
         daily_hours = average_daily_hours(db, appliance.appliance_id)
         estimate = projected_kwh(appliance, daily_hours, period_days)
+        active_total += money(estimate)
         tops.append(
             {
                 "appliance_id": appliance.appliance_id,
@@ -1200,6 +1233,7 @@ def household_dashboard(
         "rate_per_kwh": float(rate_value),
         "provider_name": rate.provider_name,
         "has_rate": rate_value > 0,
+        "has_usage": active_total > 0,
         "appliance_count": len(appliances),
         "top_appliances": tops[:5],
         "weekly": [
@@ -1222,6 +1256,12 @@ def list_bills(household_id: int, db: Db, user: CurrentUser) -> list[dict]:
         select(BillingRecord, ElectricityRate)
         .join(ElectricityRate, ElectricityRate.rate_id == BillingRecord.rate_id)
         .where(BillingRecord.household_id == household_id)
+        .where(
+            or_(
+                BillingRecord.total_kwh > 0,
+                BillingRecord.actual_bill_amount.is_not(None),
+            )
+        )
         .order_by(BillingRecord.period_start.desc())
     )
     return [
