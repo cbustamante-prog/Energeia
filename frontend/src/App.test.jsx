@@ -10,9 +10,10 @@ afterEach(() => {
 
 describe('Energeia', () => {
   it('welcomes new visitors with the sign-in form', async () => {
-    render(<App />);
+    const { container } = render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Good to see you.' })).toBeTruthy();
+    expect(container.querySelector('.brand-image')?.getAttribute('src')).toBe('/energeia-logo.png');
   });
 
   it('lets a visitor switch to account registration', async () => {

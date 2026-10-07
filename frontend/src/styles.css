@@ -9,14 +9,8 @@ ion-content.shell-content{--background:#f8f8f6}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--serif);font-size:23px;font-weight:800;letter-spacing:-1.35px;color:#30352d}
 .brand-small{font-size:17px;letter-spacing:-.9px;gap:7px}
 .brand-dot{color:#76a47e}
-.brand-symbol{width:29px;height:29px;display:grid;place-items:center;position:relative;border:1.7px solid #6f9e78;border-radius:50% 50% 50% 12%;transform:rotate(-43deg)}
-.brand-symbol:before,.brand-symbol:after{position:absolute;content:"";width:11px;height:1.5px;left:7px;top:11px;border-radius:5px;background:#6f9e78}
-.brand-symbol:after{width:8px;left:9px;top:15px}
-.brand-symbol>span{position:absolute;width:3px;height:11px;left:13px;top:5px;background:#6f9e78;border-radius:4px}
-.brand-small .brand-symbol{width:23px;height:23px}
-.brand-small .brand-symbol:before{left:5px;top:8px}
-.brand-small .brand-symbol:after{left:7px;top:12px}
-.brand-small .brand-symbol>span{left:10px;top:3px;height:10px}
+.brand-image{width:29px;height:29px;flex:none;border-radius:7px;object-fit:cover}
+.brand-small .brand-image{width:23px;height:23px;border-radius:6px}
 .eyebrow{font-size:9px;font-weight:700;letter-spacing:1.95px;color:#99968b;line-height:1.55}
 .live-dot,.feature-dot{display:inline-block;width:7px;height:7px;margin-right:8px;border-radius:50%;background:#80aa78;vertical-align:1px;box-shadow:0 0 0 3px #80aa781c}
 .app-loading{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:25px;background:#f8f8f6}

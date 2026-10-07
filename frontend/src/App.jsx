@@ -27,7 +27,7 @@ const PERIOD = new Date().toISOString().slice(0, 7);
 const PERIOD_LABEL = new Date().toLocaleString('en', { month: 'long', year: 'numeric' });
 
 function Logo({ small = false }) {
-  return <div className={`brand${small ? ' brand-small' : ''}`}><span className="brand-symbol"><span /></span><span>energeia<span className="brand-dot">.</span></span></div>;
+  return <div className={`brand${small ? ' brand-small' : ''}`}><img className="brand-image" src="/energeia-logo.png" alt="" aria-hidden="true" /><span>energeia<span className="brand-dot">.</span></span></div>;
 }
 
 function AuthScreen({ onLogin }) {
