@@ -1,0 +1,152 @@
+ENERGEIA - SETUP GUIDE FOR A DIFFERENT LAPTOP
+==============================================
+
+GitHub project:
+https://github.com/cbustamante-prog/Energeia
+
+This guide is for Windows and PowerShell. Each laptop runs its own copy of
+the website, API, and MySQL database. Your account and data are separate
+from the other developer's. Do not share database passwords or .env files.
+
+
+1. GET ACCESS AND INSTALL TOOLS
+-------------------------------
+
+If the GitHub repository is private, ask the owner to add your GitHub
+account as a collaborator. Accept the invitation before cloning.
+
+Install these tools before continuing:
+
+- Git for Windows
+- Node.js (includes npm)
+- Python 3.11 or newer
+- uv for Python dependency management:
+  https://docs.astral.sh/uv/getting-started/installation/
+- WampServer with its MySQL service
+
+After installing them, open PowerShell.
+
+
+2. DOWNLOAD THE PROJECT
+-----------------------
+
+Run:
+
+    git clone https://github.com/cbustamante-prog/Energeia.git
+    cd Energeia
+
+This downloads the latest version of the project from the main branch.
+If Git reports that you do not have permission, ask the owner to add your
+GitHub account to the private repository and accept the invitation.
+
+When the project is already cloned and you want to get later updates,
+open PowerShell in the project folder and run:
+
+    git pull origin main
+
+
+3. PREPARE YOUR LOCAL MYSQL DATABASE
+------------------------------------
+
+1. Start WampServer and make sure its MySQL service is running.
+2. Open phpMyAdmin (usually http://localhost/phpmyadmin).
+3. Select Import and import this file from the cloned project:
+
+       backend/schema.sql
+
+This safely creates the local database named energeia_db and its tables.
+It does not delete existing tables or data. The default local connection
+uses MySQL user "root" with a blank password.
+
+If this laptop already has a database created using the original
+Energeia SQL file, back it up first and import backend/migrate.sql once
+instead. Do not re-import the original SQL file; it may drop tables.
+
+4. START THE FASTAPI BACKEND
+----------------------------
+
+Open PowerShell in the project folder and run:
+
+    cd backend
+    Copy-Item .env.example .env
+    uv sync
+    uv run uvicorn app.main:app --reload
+
+Keep this PowerShell window open while using the site. The .env file holds
+local settings and must not be shared or uploaded to GitHub. If your local
+MySQL username, password, or port is not the default, edit DATABASE_URL in
+backend\.env to match it. The default DATABASE_URL already points to the
+local energeia_db database. URL-encode special characters in the password
+(for example, write %40 for @).
+
+Check that the API and database are connected by opening:
+
+    http://localhost:8000/api/health
+
+The expected response is:
+
+    {"status":"ok","database":"connected"}
+
+Interactive API documentation is available at:
+
+    http://localhost:8000/docs
+
+
+5. START THE WEBSITE
+--------------------
+
+Open a SECOND PowerShell window in the project folder and run:
+
+    cd frontend
+    Copy-Item .env.example .env
+    npm ci
+    npm run dev
+
+Keep this window open too. Open the local URL Vite displays; it is usually:
+
+    http://localhost:5173
+
+Create your own Energeia account on the site. Then create a household,
+set the electricity provider and rate from your bill, add appliances, and
+add their usage schedules. Estimates appear once at least one appliance
+has an active usage schedule; empty periods are not saved as zero-use bills.
+
+
+6. RUN TESTS (OPTIONAL)
+-----------------------
+
+Frontend unit tests and production build:
+
+    cd frontend
+    npm run test.unit
+    npm run build
+
+Backend API tests (uses an isolated SQLite test database):
+
+    cd backend
+    uv run pytest
+
+The backend test suite does not require WampServer and does not change
+your local MySQL records.
+
+
+TROUBLESHOOTING
+---------------
+
+- If cloning fails, confirm your GitHub account has access to this
+  repository and reopen PowerShell after installing Git.
+- If PowerShell says "Copy-Item cannot find path", check that you are in the
+  project folder (the command prompt should end in \Energeia\backend or
+  \Energeia\frontend, as appropriate).
+- If the website says it cannot reach the API, check that the backend
+  PowerShell window is still running and that the health URL above works.
+- If the health response says the database is disconnected, make sure
+  WampServer MySQL is running and backend\.env has the right credentials.
+- If PowerShell says "uv" or "npm" is not recognized after installation,
+  close and reopen PowerShell, then try again.
+- If port 5173 or 8000 is already in use, stop the other development
+  server using that port before starting Energeia.
+
+- "localhost" is this laptop. These steps run the app locally on the laptop;
+  they do not publish it on the internet or connect it to another laptop's
+  database.

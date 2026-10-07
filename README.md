@@ -20,6 +20,8 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 
 Install Git, Node.js with npm, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/). Each developer runs the app and database locally; your partner should use their own MySQL database and register their own Energeia account.
 
+For a step-by-step Windows guide to set up the project on another laptop, see [PARTNER-SETUP.txt](./PARTNER-SETUP.txt).
+
 ### 1. Get the project
 
 If the GitHub repository is private, first ask the repository owner to add you as a collaborator. Then clone it in PowerShell:
