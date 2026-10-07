@@ -71,6 +71,60 @@ def register_and_create_home(client: TestClient) -> tuple[dict, dict]:
     return household, rate_response.json()
 
 
+def test_setting_rate_updates_period_saved_with_placeholder_rate(client):
+    test_client, _ = client
+    token = create_account(test_client, "new-home@example.com")
+    test_client.headers["Authorization"] = f"Bearer {token}"
+    household_response = test_client.post(
+        "/api/households",
+        json={"household_name": "New Home"},
+    )
+    assert household_response.status_code == 201, household_response.text
+    household_id = household_response.json()["household_id"]
+
+    appliance_response = test_client.post(
+        f"/api/households/{household_id}/appliances",
+        json={"appliance_name": "Fan", "category": "Cooling", "wattage": 1000, "quantity": 1},
+    )
+    assert appliance_response.status_code == 201, appliance_response.text
+    appliance_id = appliance_response.json()["appliance_id"]
+    schedule_response = test_client.post(
+        f"/api/appliances/{appliance_id}/schedules",
+        json={
+            "days_of_week": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            "hours_per_day": 1,
+        },
+    )
+    assert schedule_response.status_code == 201, schedule_response.text
+
+    period = {"period_start": "2026-10-01", "period_end": "2026-10-31"}
+    initial_calculation = test_client.post(
+        f"/api/households/{household_id}/calculate", json=period
+    )
+    assert initial_calculation.status_code == 200, initial_calculation.text
+    assert initial_calculation.json()["estimated_cost"] == 0
+    assert initial_calculation.json()["provider_name"] == "Set your provider"
+
+    rate_response = test_client.patch(
+        f"/api/households/{household_id}/rate",
+        json={"provider_name": "Sample Electricity", "rate_per_kwh": "12.5000"},
+    )
+    assert rate_response.status_code == 200, rate_response.text
+
+    updated_calculation = test_client.post(
+        f"/api/households/{household_id}/calculate", json=period
+    )
+    assert updated_calculation.status_code == 200, updated_calculation.text
+    assert updated_calculation.json()["current_kwh"] == 31
+    assert updated_calculation.json()["estimated_cost"] == 387.5
+    assert updated_calculation.json()["provider_name"] == "Sample Electricity"
+
+    saved_bill = test_client.get(f"/api/households/{household_id}/bills").json()[0]
+    assert saved_bill["provider_name"] == "Sample Electricity"
+    assert saved_bill["rate_per_kwh"] == 12.5
+    assert saved_bill["estimated_cost"] == 387.5
+
+
 def test_estimates_history_and_scenarios_are_persistent(client):
     test_client, sessions = client
     household, saved_rate = register_and_create_home(test_client)

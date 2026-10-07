@@ -539,8 +539,20 @@ def bill_for_period(db: Session, household: Household, start: date, end: date) -
             BillingRecord.period_end == end,
         )
     )
-    # A saved billing period keeps the provider and tariff it originally captured.
-    rate_id = bill.rate_id if bill is not None else household.rate_id
+    rate_id = household.rate_id
+    if bill is not None:
+        captured_rate = db.get(ElectricityRate, bill.rate_id)
+        if captured_rate is None:
+            raise HTTPException(
+                status_code=409, detail="The electricity rate for this billing period is missing."
+            )
+        is_unconfigured_placeholder = (
+            captured_rate.provider_name == "Set your provider"
+            and Decimal(captured_rate.rate_per_kwh) == 0
+        )
+        if not is_unconfigured_placeholder:
+            rate_id = bill.rate_id
+
     rate = db.get(ElectricityRate, rate_id)
     if rate is None:
         raise HTTPException(
@@ -558,6 +570,7 @@ def bill_for_period(db: Session, household: Household, start: date, end: date) -
         )
         db.add(bill)
     else:
+        bill.rate_id = rate.rate_id
         bill.total_kwh = money(total)
         bill.estimated_cost = estimated
     return bill

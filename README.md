@@ -75,7 +75,7 @@ Each active schedule represents the appliance's hours **on each listed day**. Th
 wattage × quantity × active scheduled hours per week ÷ 7 × period days ÷ 1,000
 ```
 
-Overlapping active schedules on the same day may not exceed 24 hours. Inactive schedules are saved but not counted. Estimates are rounded to 2 decimal places for storage and billing. The first calculation saves a consumption record per active appliance and a bill for that household and billing period; recalculating updates that period rather than adding duplicate records. Older bills retain their recorded provider and rate even after you change providers. A saved appliance is archived, not erased, to protect consumption history.
+Overlapping active schedules on the same day may not exceed 24 hours. Inactive schedules are saved but not counted. Estimates are rounded to 2 decimal places for storage and billing. The first calculation saves a consumption record per active appliance and a bill for that household and billing period; recalculating updates that period rather than adding duplicate records. If a bill was first calculated before a real provider rate was configured, recalculating updates its placeholder rate to the newly selected rate. Once a real provider rate is recorded for a bill, later rate changes do not rewrite it. A saved appliance is archived, not erased, to protect consumption history.
 
 ## Tests
 
