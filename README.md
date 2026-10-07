@@ -16,7 +16,20 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 
 ## Run locally with WampServer
 
-### 1. Start MySQL
+### Before you start
+
+Install Git, Node.js with npm, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/). Each developer runs the app and database locally; your partner should use their own MySQL database and register their own Energeia account.
+
+### 1. Get the project
+
+If the GitHub repository is private, first ask the repository owner to add you as a collaborator. Then clone it in PowerShell:
+
+```powershell
+git clone https://github.com/cbustamante-prog/Energeia.git
+cd Energeia
+```
+
+### 2. Start MySQL
 
 Start MySQL in the WampServer control panel. In phpMyAdmin, select **Import** and import [`backend/schema.sql`](./backend/schema.sql).
 
@@ -24,7 +37,7 @@ Start MySQL in the WampServer control panel. In phpMyAdmin, select **Import** an
 
 The default local connection is `root` with an empty password. If your MySQL credentials differ, update `DATABASE_URL` in the next step.
 
-### 2. Start the Python API
+### 3. Start the Python API
 
 Install Python 3.11 or newer and [uv](https://docs.astral.sh/uv/), then open PowerShell:
 
@@ -39,13 +52,14 @@ Open [http://localhost:8000/docs](http://localhost:8000/docs) for the interactiv
 
 If your MySQL password includes URL-reserved characters, URL-encode it in `DATABASE_URL`. For example, encode `@` as `%40`. Before deploying outside a local development computer, set `JWT_SECRET` to a new, long, random secret, restrict `CORS_ORIGINS`, use HTTPS, and protect the `.env` file.
 
-### 3. Start the Ionic + React app
+### 4. Start the Ionic + React app
 
 In another PowerShell window:
 
 ```powershell
 cd frontend
 Copy-Item .env.example .env
+npm ci
 npm run dev
 ```
 
