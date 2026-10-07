@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -15,6 +16,7 @@ from app.main import (
     ElectricityRate,
     app,
     get_db,
+    utc_today,
 )
 
 
@@ -125,10 +127,77 @@ def test_setting_rate_updates_period_saved_with_placeholder_rate(client):
     assert saved_bill["estimated_cost"] == 387.5
 
 
+def test_changing_provider_rate_updates_current_estimate_but_keeps_history(client):
+    test_client, _ = client
+    household, _ = register_and_create_home(test_client)
+    household_id = household["household_id"]
+    appliance_response = test_client.post(
+        f"/api/households/{household_id}/appliances",
+        json={"appliance_name": "Fan", "category": "Cooling", "wattage": 1000, "quantity": 1},
+    )
+    assert appliance_response.status_code == 201, appliance_response.text
+    appliance_id = appliance_response.json()["appliance_id"]
+    schedule_response = test_client.post(
+        f"/api/appliances/{appliance_id}/schedules",
+        json={
+            "days_of_week": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            "hours_per_day": 1,
+        },
+    )
+    assert schedule_response.status_code == 201, schedule_response.text
+
+    last_month_end = utc_today().replace(day=1) - timedelta(days=1)
+    historical_period = {
+        "period_start": last_month_end.replace(day=1).isoformat(),
+        "period_end": last_month_end.isoformat(),
+    }
+    historical_bill = test_client.post(
+        f"/api/households/{household_id}/calculate", json=historical_period
+    )
+    assert historical_bill.status_code == 200, historical_bill.text
+    assert historical_bill.json()["rate_per_kwh"] == 12.5
+    historical_estimate = historical_bill.json()["estimated_cost"]
+
+    current_bill = test_client.post(f"/api/households/{household_id}/calculate", json={})
+    assert current_bill.status_code == 200, current_bill.text
+    current_period = {
+        "period_start": current_bill.json()["period_start"],
+        "period_end": current_bill.json()["period_end"],
+    }
+    assert current_bill.json()["rate_per_kwh"] == 12.5
+    previous_current_estimate = current_bill.json()["estimated_cost"]
+    assert previous_current_estimate > 0
+
+    changed_rate = test_client.patch(
+        f"/api/households/{household_id}/rate",
+        json={"provider_name": "A Different Electricity Provider", "rate_per_kwh": "15.0000"},
+    )
+    assert changed_rate.status_code == 200, changed_rate.text
+
+    updated_current_bill = test_client.post(
+        f"/api/households/{household_id}/calculate", json=current_period
+    )
+    assert updated_current_bill.status_code == 200, updated_current_bill.text
+    assert updated_current_bill.json()["current_kwh"] == current_bill.json()["current_kwh"]
+    assert updated_current_bill.json()["rate_per_kwh"] == 15
+    assert updated_current_bill.json()["estimated_cost"] == (
+        previous_current_estimate * 15 / 12.5
+    )
+
+    preserved_historical_bill = test_client.post(
+        f"/api/households/{household_id}/calculate", json=historical_period
+    )
+    assert preserved_historical_bill.status_code == 200, preserved_historical_bill.text
+    assert preserved_historical_bill.json()["rate_per_kwh"] == 12.5
+    assert preserved_historical_bill.json()["estimated_cost"] == historical_estimate
+
+
 def test_estimates_history_and_scenarios_are_persistent(client):
     test_client, sessions = client
     household, saved_rate = register_and_create_home(test_client)
     household_id = household["household_id"]
+    previous_period_end = utc_today().replace(day=1) - timedelta(days=1)
+    previous_period_start = previous_period_end.replace(day=1)
 
     appliance_response = test_client.post(
         f"/api/households/{household_id}/appliances",
@@ -151,14 +220,18 @@ def test_estimates_history_and_scenarios_are_persistent(client):
     )
     assert schedule_response.status_code == 201, schedule_response.text
 
-    period = {"period_start": "2026-10-01", "period_end": "2026-10-31"}
+    period = {
+        "period_start": previous_period_start.isoformat(),
+        "period_end": previous_period_end.isoformat(),
+    }
+    previous_period_days = (previous_period_end - previous_period_start).days + 1
     calculation = test_client.post(
         f"/api/households/{household_id}/calculate",
         json=period,
     )
     assert calculation.status_code == 200, calculation.text
-    assert calculation.json()["current_kwh"] == 248.0
-    assert calculation.json()["estimated_cost"] == 3100.0
+    assert calculation.json()["current_kwh"] == previous_period_days * 8
+    assert calculation.json()["estimated_cost"] == previous_period_days * 8 * 12.5
     assert calculation.json()["provider_name"] == "Sample Electricity"
 
     # Repeated calculations update the same saved period rather than duplicate it.
@@ -194,11 +267,12 @@ def test_estimates_history_and_scenarios_are_persistent(client):
         f"/api/households/{household_id}/calculate",
         json=period,
     )
-    assert historical_calculation.json()["estimated_cost"] == 3100.0
+    assert historical_calculation.json()["estimated_cost"] == previous_period_days * 8 * 12.5
     history = test_client.get(f"/api/households/{household_id}/bills").json()
-    assert history[0]["provider_name"] == "Sample Electricity"
-    assert history[0]["rate_per_kwh"] == 12.5
-    assert history[0]["actual_bill_amount"] == 3200.0
+    previous_bill = next(bill for bill in history if bill["period_start"] == period["period_start"])
+    assert previous_bill["provider_name"] == "Sample Electricity"
+    assert previous_bill["rate_per_kwh"] == 12.5
+    assert previous_bill["actual_bill_amount"] == 3200.0
 
     updated_recommendations = test_client.get(
         f"/api/households/{household_id}/recommendations"
@@ -223,9 +297,10 @@ def test_estimates_history_and_scenarios_are_persistent(client):
         },
     )
     assert preview.status_code == 200, preview.text
-    assert preview.json()["current_kwh"] == 248.0
-    assert preview.json()["scenario_kwh"] == 124.0
-    assert preview.json()["savings_cost"] == 1860.0
+    preview_current = preview.json()["current_kwh"]
+    assert preview_current > 0
+    assert preview.json()["scenario_kwh"] == preview_current / 2
+    assert preview.json()["savings_cost"] == preview_current / 2 * 15
 
     scenario_response = test_client.post(
         f"/api/households/{household_id}/scenarios",

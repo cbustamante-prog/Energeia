@@ -539,7 +539,9 @@ def bill_for_period(db: Session, household: Household, start: date, end: date) -
             BillingRecord.period_end == end,
         )
     )
-    rate_id = household.rate_id
+    current_start, current_end = get_period(None, None)
+    is_current_period = start == current_start and end == current_end
+    rate_id = bill.rate_id if bill is not None else household.rate_id
     if bill is not None:
         captured_rate = db.get(ElectricityRate, bill.rate_id)
         if captured_rate is None:
@@ -550,8 +552,8 @@ def bill_for_period(db: Session, household: Household, start: date, end: date) -
             captured_rate.provider_name == "Set your provider"
             and Decimal(captured_rate.rate_per_kwh) == 0
         )
-        if not is_unconfigured_placeholder:
-            rate_id = bill.rate_id
+        if is_current_period or is_unconfigured_placeholder:
+            rate_id = household.rate_id
 
     rate = db.get(ElectricityRate, rate_id)
     if rate is None:
