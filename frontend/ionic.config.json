@@ -1,0 +1,7 @@
+{
+  "name": "energeia-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}
