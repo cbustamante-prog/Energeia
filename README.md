@@ -24,9 +24,11 @@ For a step-by-step Windows guide to set up the project on another laptop, see [P
 
 ### 1. Get the project
 
-If the GitHub repository is private, first ask the repository owner to add you as a collaborator. Then clone it in PowerShell:
+If the GitHub repository is private, first ask the repository owner to add you as a collaborator. In PowerShell, clone it under your user profile (not from a protected folder such as `C:\Windows\System32`):
 
 ```powershell
+New-Item -ItemType Directory -Force "$HOME\source" | Out-Null
+Set-Location "$HOME\source"
 git clone https://github.com/cbustamante-prog/Energeia.git
 cd Energeia
 ```

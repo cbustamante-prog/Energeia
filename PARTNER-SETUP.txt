@@ -30,8 +30,12 @@ After installing them, open PowerShell.
 2. DOWNLOAD THE PROJECT
 -----------------------
 
-Run:
+Do not run `git clone` from `C:\Windows\System32`. That is a protected
+Windows folder, so Git cannot create the project there. In PowerShell, run
+these commands to clone into a folder under your Windows user profile:
 
+    New-Item -ItemType Directory -Force "$HOME\source" | Out-Null
+    Set-Location "$HOME\source"
     git clone https://github.com/cbustamante-prog/Energeia.git
     cd Energeia
 
