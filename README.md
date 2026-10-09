@@ -1,6 +1,6 @@
 # Energeia
 
-Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend and a MySQL database that runs locally with WampServer. It estimates household electricity usage from appliance wattage, quantity, and saved weekly schedules. It is a useful estimate—not a smart meter or an official electricity bill.
+Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend and a PostgreSQL database hosted on Supabase. It estimates household electricity usage from appliance wattage, quantity, and saved weekly schedules. It is a useful estimate—not a smart meter or an official electricity bill.
 
 ## Features
 
@@ -14,11 +14,11 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 - Access controls so one account cannot read another account's households.
 - Historical electricity-rate snapshots; appliances with history are archived instead of deleted.
 
-## Run locally with WampServer
+## Run locally with Supabase
 
 ### Before you start
 
-Install Git, Node.js with npm, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/). Each developer runs the app and database locally; your partner should use their own MySQL database and register their own Energeia account.
+Install Git, Node.js with npm, Python 3.11 or newer, and [uv](https://docs.astral.sh/uv/). Create a Supabase project to host the shared PostgreSQL database. Each developer runs the app and API locally and registers their own Energeia account.
 
 For a step-by-step Windows guide to set up the project on another laptop, see [PARTNER-SETUP.txt](./PARTNER-SETUP.txt).
 
@@ -33,28 +33,29 @@ git clone https://github.com/cbustamante-prog/Energeia.git
 cd Energeia
 ```
 
-### 2. Start MySQL
+### 2. Create the Supabase database
 
-Start MySQL in the WampServer control panel. In phpMyAdmin, select **Import** and import [`backend/schema.sql`](./backend/schema.sql).
+Create a project in [Supabase](https://supabase.com/). In its **SQL Editor**, open [`backend/schema.sql`](./backend/schema.sql), paste the complete script, and run it once. This creates the Energeia tables and the unconfigured **“Set your provider”** rate. It does not copy or alter data in your old MySQL database.
 
-**Already using a database created from `energeia_db.sql`?** Back up the database first, then run [`backend/migrate.sql`](./backend/migrate.sql) against `energeia_db` **once**. This migration retains existing tables and records while adding appliance archiving and protecting historical consumption. Do not reimport the original SQL file: it contains `DROP TABLE` statements.
+In Supabase, open **Connect**, choose the **Session pooler**, and copy its connection string. Use that string only in the backend's `.env` file. For a direct connection, use the direct connection details if your network supports IPv6.
 
-The default local connection is `root` with an empty password. If your MySQL credentials differ, update `DATABASE_URL` in the next step.
-
-### 3. Start the Python API
+### 3. Configure and start the Python API
 
 Install Python 3.11 or newer and [uv](https://docs.astral.sh/uv/), then open PowerShell:
 
 ```powershell
 cd backend
 Copy-Item .env.example .env
+# Edit .env and replace DATABASE_URL with the Supabase Session pooler connection string.
 uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Open [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API and [http://localhost:8000/api/health](http://localhost:8000/api/health) to check its connection to MySQL.
+When adapting the connection string from Supabase, use the SQLAlchemy driver prefix `postgresql+psycopg://` (instead of `postgresql://`) and keep `?sslmode=require`. URL-encode special characters in the database password (for example, encode `@` as `%40`).
 
-If your MySQL password includes URL-reserved characters, URL-encode it in `DATABASE_URL`. For example, encode `@` as `%40`. Before deploying outside a local development computer, set `JWT_SECRET` to a new, long, random secret, restrict `CORS_ORIGINS`, use HTTPS, and protect the `.env` file.
+Open [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API and [http://localhost:8000/api/health](http://localhost:8000/api/health) to check its connection to PostgreSQL.
+
+The API expects the tables from `backend/schema.sql` to exist; it does not create or migrate them automatically. Keep the database connection string and `JWT_SECRET` private. Never put the database URL in the frontend or commit `.env`. Before deploying outside a local development computer, set `JWT_SECRET` to a new, long, random secret, restrict `CORS_ORIGINS`, and use HTTPS.
 
 ### 4. Start the Ionic + React app
 
@@ -91,4 +92,4 @@ cd ..\backend
 uv run pytest
 ```
 
-The FastAPI test suite uses an isolated in-memory SQLite database; it does **not** need your WAMP server or modify its records. The live `/api/health` endpoint separately verifies the configured MySQL connection.
+The FastAPI test suite uses an isolated in-memory SQLite database; it does **not** need your Supabase project or modify its records. The live `/api/health` endpoint separately verifies the configured PostgreSQL connection.

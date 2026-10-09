@@ -1,3 +1,4 @@
+-- Legacy MySQL migration only. Do not run this on Supabase/PostgreSQL.
 -- Run exactly once on a database created with the original energeia_db SQL file.
 -- Make a phpMyAdmin backup before applying database changes.
 USE energeia_db;

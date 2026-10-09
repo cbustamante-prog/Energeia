@@ -33,7 +33,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sess
 
 
 class Settings(BaseSettings):
-    database_url: str = "mysql+pymysql://root:@127.0.0.1:3306/energeia_db?charset=utf8mb4"
+    database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/energeia"
     jwt_secret: str = "development-only-change-before-deploying"
     jwt_expire_minutes: int = Field(default=1440, ge=1, le=10080)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -104,7 +104,7 @@ class Appliance(Base):
     wattage: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     quantity: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
 
 class UsageSchedule(Base):

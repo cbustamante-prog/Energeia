@@ -4,9 +4,10 @@ ENERGEIA - SETUP GUIDE FOR A DIFFERENT LAPTOP
 GitHub project:
 https://github.com/cbustamante-prog/Energeia
 
-This guide is for Windows and PowerShell. Each laptop runs its own copy of
-the website, API, and MySQL database. Your account and data are separate
-from the other developer's. Do not share database passwords or .env files.
+This guide is for Windows and PowerShell. Each developer runs a local copy
+of the website and API connected to the project's Supabase PostgreSQL
+database. Register your own Energeia account. Do not share database
+passwords or .env files.
 
 
 1. GET ACCESS AND INSTALL TOOLS
@@ -22,7 +23,7 @@ Install these tools before continuing:
 - Python 3.11 or newer
 - uv for Python dependency management:
   https://docs.astral.sh/uv/getting-started/installation/
-- WampServer with its MySQL service
+- A Supabase account with access to the Energeia project
 
 After installing them, open PowerShell.
 
@@ -49,22 +50,22 @@ open PowerShell in the project folder and run:
     git pull origin main
 
 
-3. PREPARE YOUR LOCAL MYSQL DATABASE
-------------------------------------
+3. PREPARE THE SUPABASE DATABASE
+--------------------------------
 
-1. Start WampServer and make sure its MySQL service is running.
-2. Open phpMyAdmin (usually http://localhost/phpmyadmin).
-3. Select Import and import this file from the cloned project:
+1. Create or open the Energeia project in Supabase.
+2. Open the project's SQL Editor.
+3. Open backend/schema.sql from the cloned project, copy the entire file
+   into a new SQL Editor query, and run it.
 
-       backend/schema.sql
+The script creates the PostgreSQL tables and an unconfigured electricity
+rate. It does not copy, delete, or change records in an existing MySQL
+database. The old backend/migrate.sql file is MySQL-only; do not run it in
+Supabase.
 
-This safely creates the local database named energeia_db and its tables.
-It does not delete existing tables or data. The default local connection
-uses MySQL user "root" with a blank password.
-
-If this laptop already has a database created using the original
-Energeia SQL file, back it up first and import backend/migrate.sql once
-instead. Do not re-import the original SQL file; it may drop tables.
+In the Supabase dashboard, open Connect and copy the Session pooler
+connection string. The database password is available/reset from the
+project's database settings. Never commit or share this connection string.
 
 4. START THE FASTAPI BACKEND
 ----------------------------
@@ -76,12 +77,13 @@ Open PowerShell in the project folder and run:
     uv sync
     uv run uvicorn app.main:app --reload
 
-Keep this PowerShell window open while using the site. The .env file holds
-local settings and must not be shared or uploaded to GitHub. If your local
-MySQL username, password, or port is not the default, edit DATABASE_URL in
-backend\.env to match it. The default DATABASE_URL already points to the
-local energeia_db database. URL-encode special characters in the password
-(for example, write %40 for @).
+Keep this PowerShell window open while using the site. Edit
+backend\.env and replace DATABASE_URL with the Supabase Session pooler
+connection string. Use the SQLAlchemy driver prefix
+"postgresql+psycopg://" instead of "postgresql://", and keep
+"?sslmode=require". URL-encode special characters in the password (for
+example, write %40 for @). Keep .env private and never put this database
+URL in the frontend.
 
 Check that the API and database are connected by opening:
 
@@ -130,8 +132,8 @@ Backend API tests (uses an isolated SQLite test database):
     cd backend
     uv run pytest
 
-The backend test suite does not require WampServer and does not change
-your local MySQL records.
+The backend test suite uses an isolated in-memory SQLite database and does
+not require Supabase or change its records.
 
 
 TROUBLESHOOTING
@@ -144,8 +146,9 @@ TROUBLESHOOTING
   \Energeia\frontend, as appropriate).
 - If the website says it cannot reach the API, check that the backend
   PowerShell window is still running and that the health URL above works.
-- If the health response says the database is disconnected, make sure
-  WampServer MySQL is running and backend\.env has the right credentials.
+- If the health response says the database is disconnected, confirm the
+  Supabase project is available and backend\.env has the correct Session
+  pooler host, username, password, port, and sslmode.
 - If PowerShell says "uv" or "npm" is not recognized after installation,
   close and reopen PowerShell, then try again.
 - If port 5173 or 8000 is already in use, stop the other development
