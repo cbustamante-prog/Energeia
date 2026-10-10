@@ -15,11 +15,11 @@ import { fmtKwh, fmtMoney, request } from './api.js';
 setupIonicReact();
 
 const NAV = [
-  { id: 'overview', label: 'Overview', icon: gridOutline },
-  { id: 'appliances', label: 'My appliances', icon: flashOutline },
-  { id: 'history', label: 'Usage & bills', icon: pulseOutline },
-  { id: 'insights', label: 'Recommendations', icon: sparklesOutline },
-  { id: 'scenarios', label: 'What-if planner', icon: bulbOutline },
+  { id: 'overview', label: 'Overview', mobileLabel: 'Home', icon: gridOutline },
+  { id: 'appliances', label: 'My appliances', mobileLabel: 'Appliances', icon: flashOutline },
+  { id: 'history', label: 'Usage & bills', mobileLabel: 'Bills', icon: pulseOutline },
+  { id: 'insights', label: 'Recommendations', mobileLabel: 'Insights', icon: sparklesOutline },
+  { id: 'scenarios', label: 'What-if planner', mobileLabel: 'Planner', icon: bulbOutline },
 ];
 const CATEGORIES = ['Cooling', 'Kitchen', 'Laundry', 'Lighting', 'Electronics', 'Water heating', 'Other'];
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -603,6 +603,19 @@ function App() {
               </section>}
             </div>
           </main>
+          <nav className="mobile-nav" aria-label="Main navigation">
+            {NAV.map((item) => (
+              <button
+                key={item.id}
+                className={`mobile-nav-item${page === item.id ? ' mobile-nav-item-active' : ''}`}
+                aria-current={page === item.id ? 'page' : undefined}
+                onClick={() => changePage(item.id)}
+              >
+                <IonIcon icon={item.icon} />
+                <span>{item.mobileLabel}</span>
+              </button>
+            ))}
+          </nav>
         </div>
       </IonContent>
       <IonToast isOpen={!!notice} message={notice} duration={3000} position="top" onDidDismiss={() => setNotice('')} />

@@ -437,3 +437,143 @@ ion-toast{--background:#343b33;--color:#fff;--border-radius:5px;--box-shadow:0 5
 @media(max-width:520px){.auth-highlights>span{font-size:10.5px}}
 @media(max-width:380px){.auth-highlights>span{font-size:9px}}
 @media(max-width:760px){.auth-page{height:100dvh;overflow-y:auto;overscroll-behavior:contain}}
+
+:root{--green:#078f83;--green-dark:#06776e;--ink:#263431;--muted:#74827e;--line:#e6edeb}
+body{min-width:320px;background:#f5f8f7}
+ion-content.shell-content{--background:#f5f8f7}
+ion-button.primary-button{--background:#078f83;--background-hover:#06796f;--background-activated:#056a62;--border-radius:10px}
+.brand-dot{color:#078f83}
+.sidebar{background:#fff;border-right-color:#e8eeec}
+.nav-link-active{background:#e7f5f3;color:#087d73}
+.nav-link-active>ion-icon{color:#078f83}
+.text-action{border-color:#dfe9e6;border-radius:9px;color:#07877c}
+.text-action:hover{border-color:#a8d5cf;background:#f0faf8}
+.header-avatar{border-radius:50%}
+.page-intro .eyebrow{color:#07877c}
+.intro-private{color:#07877c}
+.feature-card{min-height:202px;border:1px solid #e5eeeb;border-radius:16px;background:#fff;color:#263431;box-shadow:0 5px 20px #193b3210}
+.feature-topline{color:#74827e}
+.feature-topline .feature-dot{background:#078f83;box-shadow:0 0 0 3px #078f8318}
+.subtle-label{color:#87938f}
+.feature-number{color:#087f75}
+.feature-number>span{color:#74827e}
+.feature-main>div:first-child>p{color:#74827e}
+.feature-emblem{border-color:#cae9e4;background:#e9f7f5;color:#078f83}
+.emblem-orbit{border-color:#078f8326}
+.feature-bottom{border-top-color:#e8eeec}
+.pill-icon{background:#e8f6f3;color:#07877c}
+.cost-pill>span:nth-child(2){color:#72807c}
+.rate-setup-link{color:#087f75}
+.rate-setup-link>span:nth-child(2){color:#72807c}
+.rate-setup-link>strong{color:#087f75}
+.rate-caption{color:#84918d}
+.summary-card,.chart-card,.appliance-card,.mini-appliance,.history-callout,.recommendation-card,.scenario-row,.scenario-result,.scenario-preview-card{border-radius:13px;box-shadow:0 4px 16px #193b3208}
+.summary-leaf{background:#e8f6f3;color:#078f83}
+.summary-change,.change-good{color:#07877c}
+.inline-link,.plain-link{color:#07877c}
+.bar-fill{background:#72c7bd}
+.bar-highlight{background:#078f83}
+.legend-green{background:#078f83}
+.appliance-icon{background:#e7f5f3;color:#07877c}
+.mini-icon{background:#e7f5f3;color:#07877c}
+.mini-kwh,.appliance-consumption>strong{color:#087f75}
+.side-note,.insight-feature,.scenario-intro{border-radius:14px}
+.insight-feature{background:#e8f6f3}
+.insight-feature>.eyebrow,.scenario-intro>div:nth-child(2)>.eyebrow{color:#087f75}
+.scenario-orb{color:#078f83}
+.count-badge{background:#e7f5f3;color:#07877c}
+.schedule-switch.is-on{background:#078f83}
+.schedule-indicator{background:#e7f5f3}
+.schedule-indicator>span{background:#078f83}
+.app-modal{--border-radius:16px}
+.global-error{border-radius:10px}
+.mobile-nav{display:none}
+
+@media(max-width:760px){
+  .auth-page{min-height:100dvh;height:auto;grid-template-columns:1fr;background:#f5f8f7}
+  .auth-left{display:none}
+  .auth-right{min-height:100dvh;align-items:center;padding:30px 22px}
+  .auth-mini{padding-bottom:36px}
+  .app-shell{display:block;min-height:100dvh;padding-bottom:calc(68px + env(safe-area-inset-bottom))}
+  .sidebar{display:none}
+  .menu-toggle{display:none}
+  .main-pane{min-height:100dvh;background:#f5f8f7}
+  .topbar{height:59px;padding:0 18px;background:#fff;border-bottom-color:#e8eeec}
+  .breadcrumb{gap:7px;font-size:12px}
+  .topbar-right{gap:8px}
+  .household-picker{padding:6px 8px;border:1px solid #e6eeeb;border-radius:9px;background:#fff}
+  .page-inner{width:100%;padding:24px 18px calc(25px + env(safe-area-inset-bottom))}
+  .page-intro{align-items:flex-start;margin-bottom:22px}
+  .page-intro .eyebrow{font-size:10px;letter-spacing:1.4px}
+  .page-intro h1{max-width:500px;margin-top:8px;font-size:clamp(27px,6vw,34px);letter-spacing:-1.2px}
+  .page-intro>div>p{font-size:12px;line-height:1.6}
+  .intro-actions{padding-top:20px}
+  .overview-top{grid-template-columns:minmax(0,1fr);gap:12px}
+  .feature-card{min-height:0;padding:20px 18px 14px}
+  .feature-topline{font-size:10px}
+  .feature-main{min-height:112px}
+  .feature-number{font-size:clamp(48px,13vw,64px)}
+  .feature-number>span{font-size:15px}
+  .feature-main>div:first-child>p{max-width:260px;font-size:13px;line-height:1.55}
+  .feature-emblem{width:58px;height:58px;margin-right:2px}
+  .feature-emblem>ion-icon{font-size:26px}
+  .feature-bottom{align-items:flex-start;flex-direction:column;gap:7px;padding-top:12px}
+  .cost-pill{gap:9px}
+  .cost-pill>span:nth-child(2),.rate-setup-link>span:nth-child(2){font-size:10px}
+  .cost-pill>strong{font-size:18px}
+  .rate-caption{max-width:100%;font-size:11px;text-align:left;white-space:normal}
+  .summary-card{min-height:0;padding:17px}
+  .summary-card h3{font-size:23px}
+  .summary-card>p{font-size:12px;line-height:1.65}
+  .summary-change{margin-top:18px;font-size:11px}
+  .inline-link,.plain-link{font-size:12px}
+  .section-row{align-items:flex-end;margin:25px 0 12px}
+  .section-eyebrow{font-size:10px;letter-spacing:1.2px}
+  .section-row h2{font-size:21px}
+  .chart-card{padding:16px 14px 12px}
+  .chart-heading strong{font-size:13px}
+  .chart-heading p{font-size:11px}
+  .chart-legend{font-size:9px}
+  .bar-chart{height:150px;gap:9px;padding:16px 8px 0}
+  .bar-track{height:94px;width:min(34px,70%)}
+  .bar-value,.bar-label{font-size:10px}
+  .chart-footer{font-size:10px;line-height:1.55}
+  .appliance-strip{grid-template-columns:1fr;gap:9px}
+  .mini-appliance{min-height:64px;padding:11px}
+  .mini-copy strong{font-size:12px}
+  .mini-copy>span{font-size:10px}
+  .mini-kwh{font-size:12px}
+  .content-grid{grid-template-columns:minmax(0,1fr)}
+  .side-note{display:none}
+  .appliance-card{padding:13px 12px 10px}
+  .appliance-name h3{font-size:14px}
+  .appliance-name>span,.appliance-consumption>span{font-size:10px}
+  .appliance-consumption>strong{font-size:14px}
+  .schedule-copy strong{font-size:12px}
+  .schedule-copy>span{font-size:10px}
+  .mobile-nav{position:fixed;z-index:20;right:0;bottom:0;left:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));height:calc(66px + env(safe-area-inset-bottom));padding:7px 8px calc(7px + env(safe-area-inset-bottom));border-top:1px solid #e6edeb;background:#fffffffa;box-shadow:0 -4px 18px #193b320a;backdrop-filter:blur(14px)}
+  .mobile-nav-item{display:flex;min-width:0;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:4px 2px;border:0;border-radius:10px;background:transparent;color:#77837f;cursor:pointer}
+  .mobile-nav-item>ion-icon{font-size:20px}
+  .mobile-nav-item>span{max-width:100%;overflow:hidden;font-size:10px;font-weight:550;text-overflow:ellipsis;white-space:nowrap}
+  .mobile-nav-item-active{background:#e8f6f3;color:#07877c}
+  .scenario-layout{grid-template-columns:minmax(0,1fr)}
+  .scenario-intro,.insight-feature{border-radius:14px}
+}
+@media(max-width:520px){
+  .topbar{padding-right:13px;padding-left:13px}
+  .page-inner{padding-right:15px;padding-left:15px}
+  .page-intro{gap:4px}
+  .page-intro h1{max-width:310px;font-size:clamp(25px,7vw,31px)}
+  .page-intro>div>p{font-size:11px}
+  .topbar-right{gap:5px}
+  .header-divider{display:none}
+  .household-picker select{max-width:88px}
+  .summary-card>p{max-width:300px}
+  .history-callout{border-radius:12px}
+}
+@media(max-width:360px){
+  .page-inner{padding-right:12px;padding-left:12px}
+  .mobile-nav{padding-right:4px;padding-left:4px}
+  .mobile-nav-item>span{font-size:9px}
+  .topbar-right{gap:3px}
+}
