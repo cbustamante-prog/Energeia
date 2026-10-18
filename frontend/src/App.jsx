@@ -7,7 +7,7 @@ import {
   addOutline, arrowDownOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
   checkmarkCircleOutline, chevronDownOutline, chevronForwardOutline, closeOutline,
   createOutline, flashOutline, gridOutline, homeOutline, leafOutline, logOutOutline,
-  menuOutline, playOutline, pulseOutline, sparklesOutline, timeOutline, trashOutline,
+  menuOutline, moonOutline, playOutline, pulseOutline, sparklesOutline, sunnyOutline, timeOutline, trashOutline,
   trendingDownOutline, walletOutline, waterOutline,
 } from 'ionicons/icons';
 import { fmtKwh, fmtMoney, request } from './api.js';
@@ -16,10 +16,10 @@ setupIonicReact();
 
 const NAV = [
   { id: 'overview', label: 'Overview', mobileLabel: 'Home', icon: gridOutline },
-  { id: 'appliances', label: 'My appliances', mobileLabel: 'Appliances', icon: flashOutline },
-  { id: 'history', label: 'Usage & bills', mobileLabel: 'Bills', icon: pulseOutline },
+  { id: 'appliances', label: 'Appliances', mobileLabel: 'Appliances', icon: flashOutline },
+  { id: 'history', label: 'Usage & Bills', mobileLabel: 'Usage', icon: pulseOutline },
   { id: 'insights', label: 'Recommendations', mobileLabel: 'Insights', icon: sparklesOutline },
-  { id: 'scenarios', label: 'What-if planner', mobileLabel: 'Planner', icon: bulbOutline },
+  { id: 'scenarios', label: 'What-if Planner', mobileLabel: 'Planner', icon: bulbOutline },
 ];
 const CATEGORIES = ['Cooling', 'Kitchen', 'Laundry', 'Lighting', 'Electronics', 'Water heating', 'Other'];
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -30,7 +30,21 @@ function Logo({ small = false }) {
   return <div className={`brand${small ? ' brand-small' : ''}`}><img className="brand-image" src="/energeia-logo.png" alt="" aria-hidden="true" /><span>energeia<span className="brand-dot">.</span></span></div>;
 }
 
-function AuthScreen({ onLogin }) {
+function ThemeToggle({ darkMode, onToggle }) {
+  return (
+    <button
+      className="theme-toggle"
+      type="button"
+      aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+      title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+      onClick={onToggle}
+    >
+      <IonIcon icon={darkMode ? sunnyOutline : moonOutline} />
+    </button>
+  );
+}
+
+function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
   const [registering, setRegistering] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -78,7 +92,7 @@ function AuthScreen({ onLogin }) {
       </div>
       <div className="auth-right">
         <form className="auth-card" onSubmit={submit}>
-          <div className="auth-mini"><Logo small /><span className="secure-label"><span>✳</span> YOUR PERSONAL ENERGY SPACE</span></div>
+          <div className="auth-mini"><Logo small /><span className="secure-label"><span>✳</span> YOUR PERSONAL ENERGY SPACE</span><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} /></div>
           <div className="auth-welcome"><div className="eyebrow">{registering ? 'A LITTLE LESS GUESSWORK' : 'WELCOME BACK'}</div>
             <h2>{registering ? 'Let’s get started.' : 'Good to see you.'}</h2>
             <p>{registering ? 'Your energy story starts here.' : 'Your household is right where you left it.'}</p></div>
@@ -116,6 +130,10 @@ function Field({ label, children, hint }) {
 }
 
 function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem('energeia_theme');
+    return savedTheme ? savedTheme === 'dark' : Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  });
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('overview');
@@ -140,6 +158,12 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const currentHousehold = households.find((item) => item.household_id === Number(householdId));
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+    localStorage.setItem('energeia_theme', darkMode ? 'dark' : 'light');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkMode ? '#121a18' : '#f4f7f5');
+  }, [darkMode]);
 
   function updateFormField(event) {
     const field = event.currentTarget.name;
@@ -261,15 +285,15 @@ function App() {
   }
 
   if (loading && !user) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
-  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} /></IonApp>;
+  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} darkMode={darkMode} onToggleTheme={() => setDarkMode((value) => !value)} /></IonApp>;
   if (loading && !households.length) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
 
   const pageTitle = {
-    overview: 'A little more in balance.',
-    appliances: 'What’s using your energy?',
-    history: 'It all adds up.',
-    insights: 'Small changes, real impact.',
-    scenarios: 'What if we tried something different?',
+    overview: 'Your Home Energy',
+    appliances: 'Your Appliances',
+    history: 'Usage & Bills',
+    insights: 'Energy-Saving Ideas',
+    scenarios: 'Explore Your Savings',
   }[page];
 
   const openCreateAppliance = () => { setEditingAppliance(null); openModal('appliance'); };
@@ -460,7 +484,7 @@ function App() {
 
   if (user && !households.length && !loading) {
     return <IonApp>
-      <main className="welcome-page"><header className="welcome-top"><Logo /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></header>
+      <main className="welcome-page"><header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={() => setDarkMode((value) => !value)} /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></div></header>
         <section className="welcome-card"><span className="welcome-orbit orbit-one" /><span className="welcome-orbit orbit-two" /><div className="welcome-icon"><IonIcon icon={homeOutline} /></div>
           <div className="eyebrow">EVERYTHING STARTS AT HOME</div><h1>Let’s make it<br />a little <span>clearer.</span></h1>
           <p>First, give your household a name. You can add appliances, set your electricity rate, and start understanding where your energy goes.</p>
@@ -501,6 +525,7 @@ function App() {
 
           <main className="main-pane">
             <header className="topbar"><button className="icon-button menu-toggle" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><IonIcon icon={menuOutline} /></button>
+              <div className="mobile-header-brand"><Logo small /><span>{pageTitle}</span></div>
               <div className="breadcrumb"><span>My home</span><IonIcon icon={chevronForwardOutline} /><span className="breadcrumb-current">{currentHousehold?.household_name || 'Your household'}</span></div>
               <div className="topbar-right">{households.length > 1 &&
                 <div className="household-picker"><IonIcon icon={homeOutline} /><select value={householdId} aria-label="Select household" onChange={(event) => { setDashboard(null); setHouseholdId(event.target.value); }}>{
@@ -508,11 +533,11 @@ function App() {
                 }</select><IonIcon icon={chevronDownOutline} /></div>}
                 <button className="text-action" onClick={() => openModal('rate', Number(selectedRate?.rate_per_kwh) > 0 ? { provider_name: selectedRate.provider_name, rate_per_kwh: selectedRate.rate_per_kwh } : {})}><IonIcon icon={flashOutline} /> <span>{Number(selectedRate?.rate_per_kwh) > 0 ? 'Edit rate' : 'Set rate'}</span></button>
                 <button className="text-action" onClick={() => { setEditingHousehold(null); openModal('household'); }}><IonIcon icon={addOutline} /> <span>New home</span></button>
-                {currentHousehold && <button className="household-edit" title="Edit household details" onClick={() => { setEditingHousehold(currentHousehold); openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' }); }}><IonIcon icon={createOutline} /></button>}<span className="header-divider" /><button className="header-avatar" title={user?.full_name} onClick={() => openModal('account')}>{signedInInitial}</button></div>
+                {currentHousehold && <button className="household-edit" title="Edit household details" onClick={() => { setEditingHousehold(currentHousehold); openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' }); }}><IonIcon icon={createOutline} /></button>}<ThemeToggle darkMode={darkMode} onToggle={() => setDarkMode((value) => !value)} /><span className="header-divider" /><button className="header-avatar" aria-label={`Account: ${user?.full_name}`} title={user?.full_name} onClick={() => openModal('account')}>{signedInInitial}</button></div>
             </header>
 
             <div className="page-inner">
-              <section className="page-intro"><div><div className="eyebrow"><span className="live-dot" /> A MORE THOUGHTFUL HOME</div><h1>{pageTitle}</h1><p>{currentHousehold?.address || currentHousehold?.household_name || 'Your household'} <span className="intro-dot">·</span> {PERIOD_LABEL} <span className="intro-dot">·</span> <span className="intro-private">Just for you</span></p></div>
+              <section className="page-intro"><div><div className="eyebrow"><span className="live-dot" /> HOME ENERGY</div><h1>{pageTitle}</h1><p>{currentHousehold?.address || currentHousehold?.household_name || 'Your household'} <span className="intro-dot">·</span> {PERIOD_LABEL}</p></div>
                 <div className="intro-actions"><span className="update-stamp"><IonIcon icon={calendarClearOutline} /> This billing period</span>
                   {page === 'appliances' && <IonButton className="primary-button compact-button" onClick={openCreateAppliance}><IonIcon icon={addOutline} slot="start" />Add appliance</IonButton>}</div>
               </section>
@@ -530,6 +555,18 @@ function App() {
                       <><div className="summary-change change-good"><IonIcon icon={checkmarkCircleOutline} /> JUST GETTING STARTED</div><h3>Every little<br />bit counts.</h3><p>As you track more billing periods, we’ll help you spot the changes.</p></>}
                     <button className="inline-link" onClick={() => changePage('history')}>See your history <IonIcon icon={chevronForwardOutline} /></button>
                   </article>
+                </div>
+                <div className="overview-stat-grid">
+                  <button className="overview-stat" onClick={() => changePage('appliances')}>
+                    <span className="overview-stat-icon"><IonIcon icon={flashOutline} /></span>
+                    <span><strong>{appliances.length}</strong><span>{appliances.length === 1 ? 'Appliance' : 'Appliances'}</span></span>
+                    <IonIcon className="overview-stat-arrow" icon={chevronForwardOutline} />
+                  </button>
+                  <button className="overview-stat" onClick={() => changePage('insights')}>
+                    <span className="overview-stat-icon"><IonIcon icon={leafOutline} /></span>
+                    <span><strong>{recommendations.length}</strong><span>{recommendations.length === 1 ? 'Energy-saving idea' : 'Energy-saving ideas'}</span></span>
+                    <IonIcon className="overview-stat-arrow" icon={chevronForwardOutline} />
+                  </button>
                 </div>
                 <div className="section-row"><div><span className="eyebrow section-eyebrow">THE BIGGER PICTURE</span><h2>A week at home</h2></div><button className="plain-link" onClick={() => changePage('history')}>Your usage history <IonIcon icon={chevronForwardOutline} /></button></div>
                 <article className="chart-card"><div className="chart-heading"><div><strong>Your weekly rhythm</strong><p>A daily average, based on your saved schedules.</p></div><div className="chart-legend"><span /> DAILY AVERAGE</div></div>

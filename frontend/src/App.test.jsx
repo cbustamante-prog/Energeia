@@ -23,4 +23,13 @@ describe('Energeia', () => {
     expect(await screen.findByRole('heading', { name: 'Let’s get started.' })).toBeTruthy();
     expect(screen.getByText('Your name')).toBeTruthy();
   });
+
+  it('toggles and persists the selected color theme', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(window.localStorage.getItem('energeia_theme')).toBe('dark');
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toBeTruthy();
+  });
 });
