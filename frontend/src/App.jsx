@@ -6,7 +6,7 @@ import {
 import {
   addOutline, arrowDownOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
   checkmarkCircleOutline, chevronDownOutline, chevronForwardOutline, closeOutline,
-  createOutline, flashOutline, gridOutline, homeOutline, leafOutline, logOutOutline,
+  chevronBackOutline, createOutline, flashOutline, gridOutline, homeOutline, leafOutline, logOutOutline,
   menuOutline, moonOutline, playOutline, pulseOutline, sparklesOutline, sunnyOutline, timeOutline, trashOutline,
   trendingDownOutline, walletOutline, waterOutline,
 } from 'ionicons/icons';
@@ -215,14 +215,15 @@ function App() {
     );
     let dashData;
     if (calculate) {
-      dashData = await request(`/households/${id}/calculate`, { method: 'POST', body: {} });
-      const latestBills = await request(`/households/${id}/bills`);
+      await request(`/households/${id}/calculate`, { method: 'POST', body: {} });
+      const [dashboardData, latestBills] = await Promise.all([
+        request(`/households/${id}/dashboard${query}`),
+        request(`/households/${id}/bills`),
+      ]);
+      dashData = dashboardData;
       setBills(latestBills);
     } else {
-      [dashData] = await Promise.all([
-        request(`/households/${id}/dashboard${query}`),
-        Promise.resolve(),
-      ]);
+      dashData = await request(`/households/${id}/dashboard${query}`);
       setBills(billData);
     }
     setAppliances(applianceData);
@@ -505,6 +506,7 @@ function App() {
   const maxBar = Math.max(1, ...bars.map((bar) => bar.kwh));
   const dismissError = () => setError('');
   const signedInInitial = (user?.full_name || 'U').trim().charAt(0).toUpperCase();
+  const signedInFirstName = (user?.full_name || 'there').trim().split(/\s+/)[0];
 
   return <IonApp>
     <IonPage>
@@ -525,7 +527,11 @@ function App() {
 
           <main className="main-pane">
             <header className="topbar"><button className="icon-button menu-toggle" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><IonIcon icon={menuOutline} /></button>
-              <div className="mobile-header-brand"><Logo small /><span>{pageTitle}</span></div>
+              <div className={`mobile-header-brand${page === 'overview' ? ' mobile-header-home' : ''}`}>
+                {page === 'overview'
+                  ? <><span className="mobile-greeting-avatar">{signedInInitial}</span><span className="mobile-greeting-copy"><strong>Welcome, {signedInFirstName}</strong><small>Here’s your energy overview</small></span></>
+                  : <><button className="mobile-back" aria-label="Back to overview" onClick={() => changePage('overview')}><IonIcon icon={chevronBackOutline} /></button><span className="mobile-page-title">{pageTitle}</span></>}
+              </div>
               <div className="breadcrumb"><span>My home</span><IonIcon icon={chevronForwardOutline} /><span className="breadcrumb-current">{currentHousehold?.household_name || 'Your household'}</span></div>
               <div className="topbar-right">{households.length > 1 &&
                 <div className="household-picker"><IonIcon icon={homeOutline} /><select value={householdId} aria-label="Select household" onChange={(event) => { setDashboard(null); setHouseholdId(event.target.value); }}>{
@@ -544,37 +550,26 @@ function App() {
               {error && <div className="global-error"><span>{error}</span><button className="icon-button" onClick={dismissError} aria-label="Dismiss error"><IonIcon icon={closeOutline} /></button></div>}
 
               {page === 'overview' && <section className="view overview-view">
-                <div className="overview-top">
-                  <article className="feature-card"><div className="feature-topline"><span><span className="feature-dot" /> YOUR ESTIMATED USAGE</span><span className="subtle-label">{PERIOD_LABEL.toUpperCase()}</span></div>
-                    <div className="feature-main"><div><div className="feature-number">{hasUsage ? fmtKwh(dashboard?.current_kwh) : '—'}{hasUsage && <span>kWh</span>}</div><p>{hasUsage ? 'This is what your household is using this period.' : 'Add appliances and schedules to see your estimated usage.'}</p></div><div className="feature-emblem"><span className="emblem-orbit" /><IonIcon icon={flashOutline} /><span className="emblem-spark">✳</span></div></div>
-                                  <div className="feature-bottom">{!hasUsage ? <div className="cost-pill cost-pill-empty"><span className="pill-icon"><IonIcon icon={walletOutline} /></span><span>ESTIMATED BILL</span><strong>—</strong></div> : Number(selectedRate?.rate_per_kwh) > 0 ? <div className="cost-pill"><span className="pill-icon"><IonIcon icon={walletOutline} /></span><span>ESTIMATED BILL</span><strong>{fmtMoney(dashboard?.estimated_cost)}</strong></div> : <button className="rate-setup-link" onClick={() => openModal('rate')}><span className="pill-icon"><IonIcon icon={walletOutline} /></span><span>ADD YOUR ELECTRICITY RATE</span><strong>Set rate <IonIcon icon={chevronForwardOutline} /></strong></button>}
-                                    <span className="rate-caption">{!hasUsage ? 'Your estimate will appear when appliance schedules are active.' : Number(selectedRate?.rate_per_kwh) > 0 ? `${selectedRate.provider_name} · ₱${Number(selectedRate.rate_per_kwh).toFixed(2)}/kWh` : 'Your estimates will use your actual provider rate.'}</span></div>
+                <div className="dashboard-heading"><div><h1>Energy overview</h1><p>Monitor your household energy use for {PERIOD_LABEL}.</p></div><span className="dashboard-live"><span /> This billing period</span></div>
+                <div className="dashboard-metrics">
+                  <article className="metric-card metric-card-primary"><span className="metric-label">Estimated usage</span><strong>{hasUsage ? fmtKwh(dashboard?.current_kwh) : '—'}{hasUsage && <small> kWh</small>}</strong><span className="metric-note">{hasUsage ? PERIOD_LABEL : 'Add schedules to get an estimate'}</span></article>
+                  <article className="metric-card"><span className="metric-label">Estimated bill</span><strong>{hasUsage && Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : '—'}</strong><span className="metric-note">{Number(selectedRate?.rate_per_kwh) > 0 ? selectedRate.provider_name : 'Set your provider rate'}</span>{(!hasUsage || Number(selectedRate?.rate_per_kwh) <= 0) && <button className="metric-action" onClick={() => openModal('rate')}>Set electricity rate <IonIcon icon={chevronForwardOutline} /></button>}</article>
+                  <article className="metric-card"><span className="metric-label">Appliances</span><strong>{appliances.length}</strong><span className="metric-note">In this household</span><button className="metric-action" onClick={() => changePage('appliances')}>Manage appliances <IonIcon icon={chevronForwardOutline} /></button></article>
+                  <article className="metric-card"><span className="metric-label">Energy-saving ideas</span><strong>{recommendations.length}</strong><span className="metric-note">Based on your saved usage</span><button className="metric-action" onClick={() => changePage('insights')}>View ideas <IonIcon icon={chevronForwardOutline} /></button></article>
+                </div>
+                <div className="overview-analysis">
+                  <article className="summary-card"><div className="card-overline">BILLING PERIOD COMPARISON</div><div className="summary-leaf"><IonIcon icon={leafOutline} /></div>
+                    {hasUsage && Number(dashboard?.previous_kwh) > 0 ? <><div className={`summary-change${Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? ' change-good' : ' change-up'}`}><IonIcon icon={Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? arrowDownOutline : arrowUpOutline} /> {fmtKwh(Math.abs(Number(dashboard.current_kwh) - Number(dashboard.previous_kwh)))} kWh</div><h3>{Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? 'Using less energy' : 'Using more energy'}</h3><p>Compared with your last saved billing period.</p></> :
+                      <><div className="summary-change change-good"><IonIcon icon={checkmarkCircleOutline} /> NO COMPARISON YET</div><h3>{hasUsage ? 'Keep tracking usage' : 'Start with an appliance'}</h3><p>{hasUsage ? 'A comparison appears after another billing period is saved.' : 'Add an appliance and its schedule to see your energy estimates.'}</p></>}
+                    <button className="inline-link" onClick={() => changePage(hasUsage ? 'history' : 'appliances')}>{hasUsage ? 'See usage history' : 'Add an appliance'} <IonIcon icon={chevronForwardOutline} /></button>
                   </article>
-                  <article className="summary-card"><div className="card-overline">A MOMENT TO NOTICE</div><div className="summary-leaf"><IonIcon icon={leafOutline} /></div>
-                    {hasUsage && Number(dashboard?.previous_kwh) > 0 ? <><div className={`summary-change${Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? ' change-good' : ' change-up'}`}><IonIcon icon={Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? arrowDownOutline : arrowUpOutline} /> {fmtKwh(Math.abs(Number(dashboard.current_kwh) - Number(dashboard.previous_kwh)))} kWh</div><h3>{Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? 'A little less.' : 'A little more.'}</h3><p>Compared with your last saved billing period.</p></> :
-                      <><div className="summary-change change-good"><IonIcon icon={checkmarkCircleOutline} /> JUST GETTING STARTED</div><h3>Every little<br />bit counts.</h3><p>As you track more billing periods, we’ll help you spot the changes.</p></>}
-                    <button className="inline-link" onClick={() => changePage('history')}>See your history <IonIcon icon={chevronForwardOutline} /></button>
+                  <article className="chart-card"><div className="chart-heading"><div><strong>Daily energy usage</strong><p>Estimated average use across the week</p></div><div className="chart-legend"><span /> kWh</div></div>
+                    {hasUsage && bars.some((bar) => Number(bar.kwh) > 0) ? <div className="bar-chart">{bars.map((bar) => <div className="bar-column" key={bar.day}><span className="bar-value">{fmtKwh(bar.kwh)}</span><div className="bar-track"><span className={`bar-fill${bar.highlight ? ' bar-highlight' : ''}`} style={{ height: `${Math.max(5, (bar.kwh / maxBar) * 100)}%` }} /></div><span className="bar-label">{bar.day}</span></div>)}</div> :
+                      <div className="empty-inline"><span className="empty-icon"><IonIcon icon={timeOutline} /></span><div><strong>Your weekly usage will appear here.</strong><p>Add appliance schedules to see your estimated daily energy use.</p></div><button className="plain-link" onClick={() => changePage('appliances')}>Add appliance <IonIcon icon={chevronForwardOutline} /></button></div>}
+                    <div className="chart-footer"><span>Estimates are based on your saved appliance schedules.</span></div>
                   </article>
                 </div>
-                <div className="overview-stat-grid">
-                  <button className="overview-stat" onClick={() => changePage('appliances')}>
-                    <span className="overview-stat-icon"><IonIcon icon={flashOutline} /></span>
-                    <span><strong>{appliances.length}</strong><span>{appliances.length === 1 ? 'Appliance' : 'Appliances'}</span></span>
-                    <IonIcon className="overview-stat-arrow" icon={chevronForwardOutline} />
-                  </button>
-                  <button className="overview-stat" onClick={() => changePage('insights')}>
-                    <span className="overview-stat-icon"><IonIcon icon={leafOutline} /></span>
-                    <span><strong>{recommendations.length}</strong><span>{recommendations.length === 1 ? 'Energy-saving idea' : 'Energy-saving ideas'}</span></span>
-                    <IonIcon className="overview-stat-arrow" icon={chevronForwardOutline} />
-                  </button>
-                </div>
-                <div className="section-row"><div><span className="eyebrow section-eyebrow">THE BIGGER PICTURE</span><h2>A week at home</h2></div><button className="plain-link" onClick={() => changePage('history')}>Your usage history <IonIcon icon={chevronForwardOutline} /></button></div>
-                <article className="chart-card"><div className="chart-heading"><div><strong>Your weekly rhythm</strong><p>A daily average, based on your saved schedules.</p></div><div className="chart-legend"><span /> DAILY AVERAGE</div></div>
-                  {hasUsage && bars.some((bar) => Number(bar.kwh) > 0) ? <div className="bar-chart">{bars.map((bar) => <div className="bar-column" key={bar.day}><span className="bar-value">{fmtKwh(bar.kwh)}</span><div className="bar-track"><span className={`bar-fill${bar.highlight ? ' bar-highlight' : ''}`} style={{ height: `${Math.max(5, (bar.kwh / maxBar) * 100)}%` }} /></div><span className="bar-label">{bar.day}</span></div>)}</div> :
-                    <div className="empty-inline"><span className="empty-icon"><IonIcon icon={timeOutline} /></span><div><strong>Your week hasn’t taken shape yet.</strong><p>Add appliances and schedules, and we’ll map out your daily energy rhythm.</p></div><button className="plain-link" onClick={() => changePage('appliances')}>Get started <IonIcon icon={chevronForwardOutline} /></button></div>}
-                  <div className="chart-footer"><span>Each bar is your estimated household usage per day, averaged across the week.</span><span><span className="legend-green" /> A bit above your daily average</span></div>
-                </article>
-                <div className="section-row compact-section"><div><span className="eyebrow section-eyebrow">AROUND THE HOUSE</span><h2>Where it’s going</h2></div><button className="plain-link" onClick={() => changePage('appliances')}>All appliances <IonIcon icon={chevronForwardOutline} /></button></div>
+                <div className="section-row compact-section"><div><span className="eyebrow section-eyebrow">AROUND THE HOUSE</span><h2>Your appliances</h2></div><button className="plain-link" onClick={() => changePage('appliances')}>View all <IonIcon icon={chevronForwardOutline} /></button></div>
                 {dashboard?.top_appliances?.length ? <div className="appliance-strip">{dashboard.top_appliances.slice(0, 3).map((item, index) =>
                 <article className="mini-appliance" key={item.appliance_id}><span className={`mini-icon mini-${index % 3}`}><IonIcon icon={item.category === 'Cooling' ? waterOutline : item.category === 'Lighting' ? bulbOutline : flashOutline} /></span><span className="mini-copy"><strong>{item.appliance_name}</strong><span>{item.category || 'Home appliance'} · {item.quantity} {Number(item.quantity) === 1 ? 'unit' : 'units'}</span></span><span className="mini-kwh">{Number(item.current_kwh) > 0 ? <>{fmtKwh(item.current_kwh)} <span>kWh</span></> : '—'}</span></article>)}</div> :
                   <button className="start-appliances" onClick={openCreateAppliance}><span className="plus-soft"><IonIcon icon={addOutline} /></span><span><strong>A place for everything.</strong><span>Add your appliances to see where the energy is going.</span></span><IonIcon icon={chevronForwardOutline} /></button>}
