@@ -6,19 +6,19 @@ import {
 import {
   addOutline, arrowDownOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
   checkmarkCircleOutline, chevronDownOutline, chevronForwardOutline, closeOutline,
-  chevronBackOutline, createOutline, flashOutline, gridOutline, homeOutline, leafOutline, logOutOutline,
+  createOutline, flashOutline, gridOutline, homeOutline, leafOutline, logOutOutline,
   menuOutline, moonOutline, playOutline, pulseOutline, sparklesOutline, sunnyOutline, timeOutline, trashOutline,
-  trendingDownOutline, walletOutline, waterOutline,
+  trendingDownOutline, waterOutline,
 } from 'ionicons/icons';
 import { fmtKwh, fmtMoney, request } from './api.js';
 
 setupIonicReact();
 
 const NAV = [
-  { id: 'overview', label: 'Overview', mobileLabel: 'Home', icon: gridOutline },
+  { id: 'overview', label: 'Home', mobileLabel: 'Home', icon: gridOutline },
   { id: 'appliances', label: 'Appliances', mobileLabel: 'Appliances', icon: flashOutline },
   { id: 'history', label: 'Usage & Bills', mobileLabel: 'Usage', icon: pulseOutline },
-  { id: 'insights', label: 'Recommendations', mobileLabel: 'Insights', icon: sparklesOutline },
+  { id: 'insights', label: 'Energy Tips', mobileLabel: 'Insights', icon: sparklesOutline },
   { id: 'scenarios', label: 'What-if Planner', mobileLabel: 'Planner', icon: bulbOutline },
 ];
 const CATEGORIES = ['Cooling', 'Kitchen', 'Laundry', 'Lighting', 'Electronics', 'Water heating', 'Other'];
@@ -37,6 +37,7 @@ function ThemeToggle({ darkMode, onToggle }) {
       type="button"
       aria-label={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
       title={`Switch to ${darkMode ? 'light' : 'dark'} mode`}
+      aria-pressed={darkMode}
       onClick={onToggle}
     >
       <IonIcon icon={darkMode ? sunnyOutline : moonOutline} />
@@ -79,23 +80,14 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
       <div className="auth-left">
         <Logo />
         <div className="auth-pitch">
-          <div className="eyebrow"><span className="live-dot" /> YOUR HOME, A LITTLE MORE IN BALANCE</div>
-          <h1>A clearer view<br />of your <span>energy.</span></h1>
-          <p>The small things add up. See what’s using power, what it costs, and the surprisingly simple ways to use a little less.</p>
-          <div className="auth-highlights">
-            <span><span className="highlight-icon"><IonIcon icon={flashOutline} /></span>Know where your power goes</span>
-            <span><span className="highlight-icon"><IonIcon icon={trendingDownOutline} /></span>Find room on your next bill</span>
-            <span><span className="highlight-icon"><IonIcon icon={leafOutline} /></span>Make changes that add up</span>
-          </div>
+          <h1>Home energy,<br /><span>made clear.</span></h1>
+          <p>Track appliance use and estimated bills in one place.</p>
         </div>
-        <div className="auth-foot">A more thoughtful way to power your home. <span>●</span></div>
       </div>
       <div className="auth-right">
         <form className="auth-card" onSubmit={submit}>
-          <div className="auth-mini"><Logo small /><span className="secure-label"><span>✳</span> YOUR PERSONAL ENERGY SPACE</span><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} /></div>
-          <div className="auth-welcome"><div className="eyebrow">{registering ? 'A LITTLE LESS GUESSWORK' : 'WELCOME BACK'}</div>
-            <h2>{registering ? 'Let’s get started.' : 'Good to see you.'}</h2>
-            <p>{registering ? 'Your energy story starts here.' : 'Your household is right where you left it.'}</p></div>
+          <div className="auth-mini"><Logo small /><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} /></div>
+          <div className="auth-welcome"><h2>{registering ? 'Create your account' : 'Sign in'}</h2></div>
           {registering && <label className="field-label">Your name<IonInput className="form-input" name="full_name" placeholder="e.g. Alex Santos" autocomplete="name" value={credentials.full_name} onIonInput={updateCredential} required maxlength={150} /></label>}
           <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
           <label className="field-label">Password<IonInput className="form-input" name="password" type="password" placeholder={registering ? 'At least 8 characters' : 'Enter your password'} autocomplete={registering ? 'new-password' : 'current-password'} value={credentials.password} onIonInput={updateCredential} required minlength={registering ? 8 : 1} maxlength={128} /></label>
@@ -105,7 +97,6 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
           </IonButton>
           <div className="auth-divider"><span /></div>
           <p className="auth-switch">{registering ? 'Already have an account?' : 'New to Energeia?'} <button className="text-button" type="button" onClick={() => { setRegistering(!registering); setError(''); }}>{registering ? 'Sign in' : 'Create your account'}</button></p>
-          <div className="privacy-note"><span>✓</span> Your household data stays yours. Always.</div>
         </form>
       </div>
     </main>
@@ -113,7 +104,7 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
 }
 
 function Modal({ isOpen, onClose, title, subtitle, children, wide = false }) {
-  return <IonModal isOpen={isOpen} onDidDismiss={onClose} className={wide ? 'app-modal app-modal-wide' : 'app-modal'}><div className="modal-body"><header className="modal-heading"><div><div className="eyebrow modal-eyebrow">ENERGEIA · HOME ENERGY</div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><IonIcon icon={closeOutline} /></button></header>{children}</div></IonModal>;
+  return <IonModal isOpen={isOpen} onDidDismiss={onClose} className={wide ? 'app-modal app-modal-wide' : 'app-modal'}><div className="modal-body"><header className="modal-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><IonIcon icon={closeOutline} /></button></header>{children}</div></IonModal>;
 }
 
 function ModalForm({ children, onSubmit, button, note, busy, error }) {
@@ -129,11 +120,17 @@ function Field({ label, children, hint }) {
   return <label className="field-label">{label}{children}{hint && <span className="field-hint">{hint}</span>}</label>;
 }
 
+function getInitialTheme() {
+  const currentTheme = document.documentElement.dataset.theme;
+  if (currentTheme === 'dark' || currentTheme === 'light') return currentTheme;
+  const savedTheme = localStorage.getItem('energeia_theme');
+  if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 function App() {
-  const [darkMode, setDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('energeia_theme');
-    return savedTheme ? savedTheme === 'dark' : Boolean(window.matchMedia?.('(prefers-color-scheme: dark)').matches);
-  });
+  const [theme, setTheme] = useState(getInitialTheme);
+  const darkMode = theme === 'dark';
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState('overview');
@@ -159,11 +156,25 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const currentHousehold = households.find((item) => item.household_id === Number(householdId));
 
+  const toggleTheme = useCallback(() => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('energeia_theme', nextTheme);
+    setTheme(nextTheme);
+  }, [theme]);
+
   useEffect(() => {
-    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
-    localStorage.setItem('energeia_theme', darkMode ? 'dark' : 'light');
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', darkMode ? '#121a18' : '#f4f7f5');
-  }, [darkMode]);
+    document.documentElement.dataset.theme = theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#121a18' : '#f5f7f6');
+  }, [theme]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    function closeOnEscape(event) {
+      if (event.key === 'Escape') setMenuOpen(false);
+    }
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [menuOpen]);
 
   function updateFormField(event) {
     const field = event.currentTarget.name;
@@ -286,15 +297,15 @@ function App() {
   }
 
   if (loading && !user) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
-  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} darkMode={darkMode} onToggleTheme={() => setDarkMode((value) => !value)} /></IonApp>;
+  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} darkMode={darkMode} onToggleTheme={toggleTheme} /></IonApp>;
   if (loading && !households.length) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
 
   const pageTitle = {
-    overview: 'Your Home Energy',
-    appliances: 'Your Appliances',
+    overview: 'Home',
+    appliances: 'Appliances',
     history: 'Usage & Bills',
-    insights: 'Energy-Saving Ideas',
-    scenarios: 'Explore Your Savings',
+    insights: 'Energy Tips',
+    scenarios: 'What-if Planner',
   }[page];
 
   const openCreateAppliance = () => { setEditingAppliance(null); openModal('appliance'); };
@@ -485,17 +496,16 @@ function App() {
 
   if (user && !households.length && !loading) {
     return <IonApp>
-      <main className="welcome-page"><header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={() => setDarkMode((value) => !value)} /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></div></header>
-        <section className="welcome-card"><span className="welcome-orbit orbit-one" /><span className="welcome-orbit orbit-two" /><div className="welcome-icon"><IonIcon icon={homeOutline} /></div>
-          <div className="eyebrow">EVERYTHING STARTS AT HOME</div><h1>Let’s make it<br />a little <span>clearer.</span></h1>
-          <p>First, give your household a name. You can add appliances, set your electricity rate, and start understanding where your energy goes.</p>
+      <main className="welcome-page"><header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></div></header>
+        <section className="welcome-card"><div className="welcome-icon"><IonIcon icon={homeOutline} /></div>
+          <h1>Set up your household</h1>
+          <p>Add appliances and an electricity rate to estimate your energy use and bill.</p>
           <form className="welcome-form" onSubmit={saveHousehold}>
-            <Field label="Give your household a name"><IonInput className="form-input" name="household_name" placeholder="e.g. Our home" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
+            <Field label="Household name"><IonInput className="form-input" name="household_name" placeholder="e.g. Our home" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
             <Field label="Address" hint="Optional"><IonInput className="form-input" name="address" placeholder="City or neighbourhood" value={formFields.address ?? ''} onIonInput={updateFormField} maxlength={255} /></Field>
             {error && <div className="inline-error">{error}</div>}
             <IonButton expand="block" type="submit" className="primary-button" disabled={busy}>{busy ? <IonSpinner name="crescent" /> : <>Set up my household <IonIcon icon={chevronForwardOutline} slot="end" /></>}</IonButton>
           </form>
-          <div className="welcome-secure"><span>✓</span> Private by design. Only you can see your data.</div>
         </section>
       </main>
       <IonToast isOpen={!!notice} message={notice} duration={2600} position="top" onDidDismiss={() => setNotice('')} />
@@ -506,31 +516,27 @@ function App() {
   const maxBar = Math.max(1, ...bars.map((bar) => bar.kwh));
   const dismissError = () => setError('');
   const signedInInitial = (user?.full_name || 'U').trim().charAt(0).toUpperCase();
-  const signedInFirstName = (user?.full_name || 'there').trim().split(/\s+/)[0];
 
   return <IonApp>
     <IonPage>
       <IonContent fullscreen className="shell-content">
         <div className="app-shell">
-          <aside className={`sidebar${menuOpen ? ' sidebar-open' : ''}`}>
+          <aside id="app-sidebar" className={`sidebar${menuOpen ? ' sidebar-open' : ''}`}>
             <Logo />
-            <div className="side-kicker">YOUR ENERGY, IN VIEW</div>
             <nav className="side-nav" aria-label="Main navigation">{NAV.map((item, index) =>
               <button key={item.id} className={`nav-link${page === item.id ? ' nav-link-active' : ''}`} onClick={() => changePage(item.id)}>
                 <span className="nav-number">0{index + 1}</span><IonIcon icon={item.icon} /><span>{item.label}</span>{page === item.id && <span className="nav-active-dot" />}
               </button>)}
             </nav>
             <div className="sidebar-spacer" />
-            <div className="side-tip"><span className="tip-star">✳</span><p>A small change,<br />repeated often,<br />makes a difference.</p><span className="tip-sprig">↗</span></div>
             <div className="side-account"><span className="avatar">{signedInInitial}</span><span className="account-copy"><strong>{user?.full_name}</strong><span>Personal account</span></span><button className="account-out" title="Sign out" onClick={handleLogout}><IonIcon icon={logOutOutline} /></button></div>
           </aside>
+          {menuOpen && <button className="sidebar-scrim" aria-label="Dismiss navigation menu" onClick={() => setMenuOpen(false)} />}
 
           <main className="main-pane">
-            <header className="topbar"><button className="icon-button menu-toggle" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><IonIcon icon={menuOutline} /></button>
+            <header className="topbar"><button className="icon-button menu-toggle" aria-label={menuOpen ? 'Close menu' : 'Open menu'} aria-controls="app-sidebar" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><IonIcon icon={menuOutline} /></button>
               <div className={`mobile-header-brand${page === 'overview' ? ' mobile-header-home' : ''}`}>
-                {page === 'overview'
-                  ? <><span className="mobile-greeting-avatar">{signedInInitial}</span><span className="mobile-greeting-copy"><strong>Welcome, {signedInFirstName}</strong><small>Here’s your energy overview</small></span></>
-                  : <><button className="mobile-back" aria-label="Back to overview" onClick={() => changePage('overview')}><IonIcon icon={chevronBackOutline} /></button><span className="mobile-page-title">{pageTitle}</span></>}
+                <Logo small /><h1 className="mobile-page-title">{pageTitle}</h1>
               </div>
               <div className="breadcrumb"><span>My home</span><IonIcon icon={chevronForwardOutline} /><span className="breadcrumb-current">{currentHousehold?.household_name || 'Your household'}</span></div>
               <div className="topbar-right">{households.length > 1 &&
@@ -539,46 +545,45 @@ function App() {
                 }</select><IonIcon icon={chevronDownOutline} /></div>}
                 <button className="text-action" onClick={() => openModal('rate', Number(selectedRate?.rate_per_kwh) > 0 ? { provider_name: selectedRate.provider_name, rate_per_kwh: selectedRate.rate_per_kwh } : {})}><IonIcon icon={flashOutline} /> <span>{Number(selectedRate?.rate_per_kwh) > 0 ? 'Edit rate' : 'Set rate'}</span></button>
                 <button className="text-action" onClick={() => { setEditingHousehold(null); openModal('household'); }}><IonIcon icon={addOutline} /> <span>New home</span></button>
-                {currentHousehold && <button className="household-edit" title="Edit household details" onClick={() => { setEditingHousehold(currentHousehold); openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' }); }}><IonIcon icon={createOutline} /></button>}<ThemeToggle darkMode={darkMode} onToggle={() => setDarkMode((value) => !value)} /><span className="header-divider" /><button className="header-avatar" aria-label={`Account: ${user?.full_name}`} title={user?.full_name} onClick={() => openModal('account')}>{signedInInitial}</button></div>
+                {currentHousehold && <button className="household-edit" title="Edit household details" onClick={() => { setEditingHousehold(currentHousehold); openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' }); }}><IonIcon icon={createOutline} /></button>}<ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><span className="header-divider" /><button className="header-avatar" aria-label={`Account: ${user?.full_name}`} title={user?.full_name} onClick={() => openModal('account')}>{signedInInitial}</button></div>
             </header>
 
             <div className="page-inner">
-              <section className="page-intro"><div><div className="eyebrow"><span className="live-dot" /> HOME ENERGY</div><h1>{pageTitle}</h1><p>{currentHousehold?.address || currentHousehold?.household_name || 'Your household'} <span className="intro-dot">·</span> {PERIOD_LABEL}</p></div>
+              <section className="page-intro"><div><h1>{pageTitle}</h1><p>{currentHousehold?.address || currentHousehold?.household_name || 'Your household'} <span className="intro-dot">·</span> {PERIOD_LABEL}</p></div>
                 <div className="intro-actions"><span className="update-stamp"><IonIcon icon={calendarClearOutline} /> This billing period</span>
                   {page === 'appliances' && <IonButton className="primary-button compact-button" onClick={openCreateAppliance}><IonIcon icon={addOutline} slot="start" />Add appliance</IonButton>}</div>
               </section>
               {error && <div className="global-error"><span>{error}</span><button className="icon-button" onClick={dismissError} aria-label="Dismiss error"><IonIcon icon={closeOutline} /></button></div>}
 
               {page === 'overview' && <section className="view overview-view">
-                <div className="dashboard-heading"><div><h1>Energy overview</h1><p>Monitor your household energy use for {PERIOD_LABEL}.</p></div><span className="dashboard-live"><span /> This billing period</span></div>
+                <div className="dashboard-heading"><span className="dashboard-live"><span /> This billing period</span></div>
                 <div className="dashboard-metrics">
-                  <article className="metric-card metric-card-primary"><span className="metric-label">Estimated usage</span><strong>{hasUsage ? fmtKwh(dashboard?.current_kwh) : '—'}{hasUsage && <small> kWh</small>}</strong><span className="metric-note">{hasUsage ? PERIOD_LABEL : 'Add schedules to get an estimate'}</span></article>
+                  <article className="metric-card metric-card-primary"><span className="metric-label">Energy usage</span><strong>{hasUsage ? fmtKwh(dashboard?.current_kwh) : '—'}{hasUsage && <small> kWh</small>}</strong><span className="metric-note">{hasUsage ? PERIOD_LABEL : 'Add schedules to estimate usage'}</span></article>
                   <article className="metric-card"><span className="metric-label">Estimated bill</span><strong>{hasUsage && Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : '—'}</strong><span className="metric-note">{Number(selectedRate?.rate_per_kwh) > 0 ? selectedRate.provider_name : 'Set your provider rate'}</span>{(!hasUsage || Number(selectedRate?.rate_per_kwh) <= 0) && <button className="metric-action" onClick={() => openModal('rate')}>Set electricity rate <IonIcon icon={chevronForwardOutline} /></button>}</article>
                   <article className="metric-card"><span className="metric-label">Appliances</span><strong>{appliances.length}</strong><span className="metric-note">In this household</span><button className="metric-action" onClick={() => changePage('appliances')}>Manage appliances <IonIcon icon={chevronForwardOutline} /></button></article>
-                  <article className="metric-card"><span className="metric-label">Energy-saving ideas</span><strong>{recommendations.length}</strong><span className="metric-note">Based on your saved usage</span><button className="metric-action" onClick={() => changePage('insights')}>View ideas <IonIcon icon={chevronForwardOutline} /></button></article>
+                  <article className="metric-card"><span className="metric-label">Energy tips</span><strong>{recommendations.length}</strong><span className="metric-note">Recommendations</span><button className="metric-action" onClick={() => changePage('insights')}>View tips <IonIcon icon={chevronForwardOutline} /></button></article>
                 </div>
                 <div className="overview-analysis">
-                  <article className="summary-card"><div className="card-overline">BILLING PERIOD COMPARISON</div><div className="summary-leaf"><IonIcon icon={leafOutline} /></div>
-                    {hasUsage && Number(dashboard?.previous_kwh) > 0 ? <><div className={`summary-change${Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? ' change-good' : ' change-up'}`}><IonIcon icon={Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? arrowDownOutline : arrowUpOutline} /> {fmtKwh(Math.abs(Number(dashboard.current_kwh) - Number(dashboard.previous_kwh)))} kWh</div><h3>{Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? 'Using less energy' : 'Using more energy'}</h3><p>Compared with your last saved billing period.</p></> :
+                  <article className="summary-card"><div className="card-overline">Billing period comparison</div><div className="summary-leaf"><IonIcon icon={leafOutline} /></div>
+                    {hasUsage && Number(dashboard?.previous_kwh) > 0 ? <><div className={`summary-change${Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? ' change-good' : ' change-up'}`}><IonIcon icon={Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? arrowDownOutline : arrowUpOutline} /> {fmtKwh(Math.abs(Number(dashboard.current_kwh) - Number(dashboard.previous_kwh)))} kWh</div><h3>{Number(dashboard.current_kwh) <= Number(dashboard.previous_kwh) ? 'Using less energy' : 'Using more energy'}</h3><p>Compared with last period.</p></> :
                       <><div className="summary-change change-good"><IonIcon icon={checkmarkCircleOutline} /> NO COMPARISON YET</div><h3>{hasUsage ? 'Keep tracking usage' : 'Start with an appliance'}</h3><p>{hasUsage ? 'A comparison appears after another billing period is saved.' : 'Add an appliance and its schedule to see your energy estimates.'}</p></>}
                     <button className="inline-link" onClick={() => changePage(hasUsage ? 'history' : 'appliances')}>{hasUsage ? 'See usage history' : 'Add an appliance'} <IonIcon icon={chevronForwardOutline} /></button>
                   </article>
                   <article className="chart-card"><div className="chart-heading"><div><strong>Daily energy usage</strong><p>Estimated average use across the week</p></div><div className="chart-legend"><span /> kWh</div></div>
                     {hasUsage && bars.some((bar) => Number(bar.kwh) > 0) ? <div className="bar-chart">{bars.map((bar) => <div className="bar-column" key={bar.day}><span className="bar-value">{fmtKwh(bar.kwh)}</span><div className="bar-track"><span className={`bar-fill${bar.highlight ? ' bar-highlight' : ''}`} style={{ height: `${Math.max(5, (bar.kwh / maxBar) * 100)}%` }} /></div><span className="bar-label">{bar.day}</span></div>)}</div> :
-                      <div className="empty-inline"><span className="empty-icon"><IonIcon icon={timeOutline} /></span><div><strong>Your weekly usage will appear here.</strong><p>Add appliance schedules to see your estimated daily energy use.</p></div><button className="plain-link" onClick={() => changePage('appliances')}>Add appliance <IonIcon icon={chevronForwardOutline} /></button></div>}
+                      <div className="empty-inline"><span className="empty-icon"><IonIcon icon={timeOutline} /></span><div><strong>No usage data yet.</strong><p>Add active appliance schedules to see estimated usage.</p></div></div>}
                     <div className="chart-footer"><span>Estimates are based on your saved appliance schedules.</span></div>
                   </article>
                 </div>
-                <div className="section-row compact-section"><div><span className="eyebrow section-eyebrow">AROUND THE HOUSE</span><h2>Your appliances</h2></div><button className="plain-link" onClick={() => changePage('appliances')}>View all <IonIcon icon={chevronForwardOutline} /></button></div>
+                <div className="section-row compact-section"><div><h2>Appliances</h2></div><button className="plain-link" onClick={() => changePage('appliances')}>View all <IonIcon icon={chevronForwardOutline} /></button></div>
                 {dashboard?.top_appliances?.length ? <div className="appliance-strip">{dashboard.top_appliances.slice(0, 3).map((item, index) =>
                 <article className="mini-appliance" key={item.appliance_id}><span className={`mini-icon mini-${index % 3}`}><IonIcon icon={item.category === 'Cooling' ? waterOutline : item.category === 'Lighting' ? bulbOutline : flashOutline} /></span><span className="mini-copy"><strong>{item.appliance_name}</strong><span>{item.category || 'Home appliance'} · {item.quantity} {Number(item.quantity) === 1 ? 'unit' : 'units'}</span></span><span className="mini-kwh">{Number(item.current_kwh) > 0 ? <>{fmtKwh(item.current_kwh)} <span>kWh</span></> : '—'}</span></article>)}</div> :
-                  <button className="start-appliances" onClick={openCreateAppliance}><span className="plus-soft"><IonIcon icon={addOutline} /></span><span><strong>A place for everything.</strong><span>Add your appliances to see where the energy is going.</span></span><IonIcon icon={chevronForwardOutline} /></button>}
-                <footer className="page-footer">ENERGEIA<span>·</span> A thoughtful home is made of little things.</footer>
+                  <div className="overview-empty-appliances"><p>No appliances yet.</p><IonButton className="primary-button" onClick={openCreateAppliance}><IonIcon icon={addOutline} slot="start" />Add Appliance</IonButton></div>}
               </section>}
 
               {page === 'appliances' && <section className="view">
                 <div className="content-grid"><div className="wide-content">
-                  <div className="section-row section-row-tight"><div><span className="eyebrow section-eyebrow">THE THINGS THAT KEEP HOME HUMMING</span><h2>Your appliances <span className="count-badge">{appliances.length}</span></h2></div></div>
+                  <div className="section-row section-row-tight"><div><h2>Appliances <span className="count-badge">{appliances.length}</span></h2></div></div>
                   {appliances.length ? <div className="appliance-list">{appliances.map((appliance, index) => {
                     const applianceSchedules = schedules[appliance.appliance_id] || [];
                     const current = dashboard?.top_appliances?.find((row) => row.appliance_id === appliance.appliance_id);
@@ -589,49 +594,45 @@ function App() {
                       <button className="icon-button delete-button" title="Remove appliance" onClick={() => deleteAppliance(appliance)}><IonIcon icon={trashOutline} /></button>
                     </div>
                     <div className="schedule-divider" />
-                    <div className="schedule-head"><span className="eyebrow section-eyebrow">USAGE SCHEDULES</span><button className="small-add" onClick={() => { setActiveScenario(appliance); setEditingSchedule(null); openModal('schedule'); }}><IonIcon icon={addOutline} /> Add schedule</button></div>
+                    <div className="schedule-head"><span className="eyebrow section-eyebrow">Usage schedules</span><button className="small-add" onClick={() => { setActiveScenario(appliance); setEditingSchedule(null); openModal('schedule'); }}><IonIcon icon={addOutline} /> Add schedule</button></div>
                     {applianceSchedules.length ? <div className="schedule-list">{applianceSchedules.map((schedule) => <div className={`schedule-item${schedule.is_active ? '' : ' schedule-inactive'}`} key={schedule.schedule_id}>
                       <span className="schedule-indicator">{schedule.is_active ? <span /> : <IonIcon icon={closeOutline} />}</span><div className="schedule-copy"><strong>{schedule.days_of_week.join(' · ')}</strong><span>{schedule.hours_per_day} {Number(schedule.hours_per_day) === 1 ? 'hour' : 'hours'}/day{schedule.start_time ? ` · starting ${schedule.start_time.slice(0, 5)}` : ''}</span></div>
                       <button className={`schedule-switch${schedule.is_active ? ' is-on' : ''}`} aria-label={`${schedule.is_active ? 'Pause' : 'Activate'} schedule`} onClick={() => setScheduleActive(schedule, !schedule.is_active)}><span /></button>
                       <button className="icon-button subtle-icon" title="Edit schedule" onClick={() => { setActiveScenario(appliance); setEditingSchedule(schedule); openModal('schedule', { hours_per_day: schedule.hours_per_day, start_time: schedule.start_time?.slice(0, 5) || '' }); }}><IonIcon icon={createOutline} /></button>
                       <button className="icon-button delete-button subtle-icon" title="Delete schedule" onClick={() => deleteSchedule(schedule)}><IonIcon icon={trashOutline} /></button>
-                    </div>)}</div> : <div className="schedule-empty"><IonIcon icon={timeOutline} /><span>No schedule just yet. Add one to start estimating its energy use.</span></div>}
+                    </div>)}</div> : <div className="schedule-empty"><IonIcon icon={timeOutline} /><span>No schedule yet. Add one to estimate usage.</span></div>}
                     </article>;
-                  })}</div> : <div className="empty-state"><span className="empty-state-symbol"><IonIcon icon={flashOutline} /></span><div className="eyebrow">EVERY HOME HAS ITS RHYTHM</div><h3>Let’s start with what’s<br />around the house.</h3><p>Enter an appliance’s name, wattage, and how often it runs. You can add weekday and weekend schedules separately.</p><IonButton className="primary-button" onClick={openCreateAppliance}><IonIcon icon={addOutline} slot="start" /> Add your first appliance</IonButton></div>}
-                </div><aside className="side-note"><span className="side-note-icon"><IonIcon icon={sparklesOutline} /></span><div className="eyebrow">A NOTE ABOUT ENERGY</div><h3>Wattage is only part of the story.</h3><p>How long something runs matters just as much. Add a schedule to see an appliance’s estimated monthly usage and share of your bill.</p><button className="inline-link" onClick={() => changePage('insights')}>See helpful tips <IonIcon icon={chevronForwardOutline} /></button><div className="side-note-bottom">Small adjustments, thoughtfully made.</div></aside></div>
-                <footer className="page-footer">ENERGEIA<span>·</span> Your saved history always stays intact.</footer>
+                  })}</div> : <div className="empty-state"><span className="empty-state-symbol"><IonIcon icon={flashOutline} /></span><h3>No appliances yet.</h3><IonButton className="primary-button" onClick={openCreateAppliance}><IonIcon icon={addOutline} slot="start" />Add Appliance</IonButton></div>}
+                </div></div>
               </section>}
 
               {page === 'history' && <section className="view">
-                <article className="history-callout"><div><span className="eyebrow">{hasUsage ? 'THIS IS AN ESTIMATE, NOT A SURPRISE' : 'YOUR ESTIMATE WILL APPEAR HERE'}</span><h2>{hasUsage ? <>{fmtKwh(dashboard?.current_kwh)} <span>kWh</span><span className="history-divider">·</span>{Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : 'Set your rate'}</> : 'No estimate yet'}</h2><p>{hasUsage ? `Your estimated household usage and electricity cost for ${PERIOD_LABEL}. Only active schedules are included.` : 'Add an appliance and an active usage schedule to start estimating your household usage and bill.'}</p></div>
+                <article className="history-callout"><div><span className="eyebrow">Estimated bill and usage</span><h2>{hasUsage ? <>{fmtKwh(dashboard?.current_kwh)} <span>kWh</span><span className="history-divider">·</span>{Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : 'Set your rate'}</> : 'No estimate yet'}</h2><p>{hasUsage ? `Billing period: ${PERIOD_LABEL}. Only active schedules are included.` : 'Add an appliance and usage schedule to estimate your bill.'}</p></div>
                   {hasUsage && <IonButton className="primary-button compact-button" onClick={calculateCurrentPeriod}><IonIcon icon={pulseOutline} slot="start" />Save this period</IonButton>}
                 </article>
-                <div className="section-row"><div><span className="eyebrow section-eyebrow">A LITTLE CONTEXT</span><h2>Your billing periods</h2></div><span className="plain-meta">Current and previous saved periods</span></div>
+                <div className="section-row"><div><h2>Billing periods</h2></div></div>
                 {bills.length ? <div className="bill-table-wrap"><table className="bill-table"><thead><tr><th>BILLING PERIOD</th><th>PROVIDER & RATE</th><th>ESTIMATED USAGE</th><th>ESTIMATED BILL</th><th>ACTUAL BILL</th><th /></tr></thead><tbody>{bills.map((bill) => <tr key={bill.bill_id}><td><strong>{new Date(`${bill.period_start}T00:00:00`).toLocaleString('en', { month: 'long', year: 'numeric' })}</strong><span>{bill.period_start} — {bill.period_end}</span></td><td><strong>{bill.provider_name}</strong><span>₱{Number(bill.rate_per_kwh).toFixed(2)} / kWh</span></td><td><strong>{fmtKwh(bill.total_kwh)} <span>kWh</span></strong></td><td><strong>{fmtMoney(bill.estimated_cost)}</strong></td><td>{bill.actual_bill_amount != null ? <strong>{fmtMoney(bill.actual_bill_amount)}</strong> : <button className="add-actual" onClick={() => { setActiveScenario(bill); openModal('actual-bill'); }}>+ Add actual bill</button>}</td><td>{bill.actual_bill_amount != null ? <span className={`bill-delta${Number(bill.actual_bill_amount) >= Number(bill.estimated_cost) ? ' delta-warm' : ''}`} title="Actual bill compared with estimate">{Number(bill.actual_bill_amount) >= Number(bill.estimated_cost) ? '+' : '−'}{fmtMoney(Math.abs(Number(bill.actual_bill_amount) - Number(bill.estimated_cost)))}</span> : <IonIcon className="bill-arrow" icon={chevronForwardOutline} />}</td></tr>)}</tbody></table></div> :
-                  <div className="empty-inline history-empty"><span className="empty-icon"><calendarClearOutline /></span><div><strong>No billing periods saved yet.</strong><p>Add appliances and active usage schedules to create your first estimate and billing period.</p></div><button className="plain-link" onClick={() => changePage('appliances')}>Manage appliances <IonIcon icon={chevronForwardOutline} /></button></div>}
-                <footer className="page-footer">ENERGEIA<span>·</span> Each bill keeps the provider rate that was in effect at the time.</footer>
+                  <div className="empty-inline history-empty"><span className="empty-icon"><IonIcon icon={calendarClearOutline} /></span><div><strong>No billing periods saved yet.</strong><p>Add appliances and active usage schedules to create your first estimate and billing period.</p></div><button className="plain-link" onClick={() => changePage('appliances')}>Manage appliances <IonIcon icon={chevronForwardOutline} /></button></div>}
               </section>}
 
               {page === 'insights' && <section className="view">
-                <article className="insight-feature"><span className="insight-decoration"><span /><span /><span /><IonIcon icon={leafOutline} /></span><div className="eyebrow">PRACTICAL, PERSONAL, NEVER PREACHY</div><h2>A couple of things<br />worth a second look.</h2><p>Based on your saved schedules. Yours to use—or simply dismiss.</p></article>
-                <div className="section-row"><div><span className="eyebrow section-eyebrow">NOTICED AROUND YOUR HOME</span><h2>Ideas for your household</h2></div><span className="plain-meta">{recommendations.length} {recommendations.length === 1 ? 'thought' : 'thoughts'}</span></div>
-                {recommendations.length ? <div className="recommendation-list">{recommendations.map((recommendation, index) => <article className="recommendation-card" key={recommendation.recommendation_id}>
-                  <span className={`recommendation-number recommendation-num-${index % 3}`}>0{index + 1}</span><div className="recommendation-content"><div className="eyebrow recommendation-type">{recommendation.appliance_name || 'AROUND THE HOUSE'}</div><p>{recommendation.message}</p><div className="recommendation-savings"><span><IonIcon icon={trendingDownOutline} /> POTENTIAL SAVINGS</span><strong>{fmtKwh(recommendation.potential_savings_kwh)} kWh <span>·</span> {fmtMoney(recommendation.potential_savings_cost)}</strong></div></div>
+                <div className="section-row"><div><h2>Recommendations</h2></div><span className="plain-meta">{recommendations.length}</span></div>
+                {recommendations.length ? <div className="recommendation-list">{recommendations.map((recommendation) => <article className="recommendation-card" key={recommendation.recommendation_id}>
+                  <div className="recommendation-content"><strong className="recommendation-title">{recommendation.appliance_name || 'Home'}</strong><p>{recommendation.message}</p>{(Number(recommendation.potential_savings_kwh) > 0 || Number(recommendation.potential_savings_cost) > 0) && <div className="recommendation-savings"><span><IonIcon icon={trendingDownOutline} /> Potential savings</span><strong>{Number(recommendation.potential_savings_kwh) > 0 && <>{fmtKwh(recommendation.potential_savings_kwh)} kWh</>}{Number(recommendation.potential_savings_kwh) > 0 && Number(recommendation.potential_savings_cost) > 0 && ' · '}{Number(recommendation.potential_savings_cost) > 0 && fmtMoney(recommendation.potential_savings_cost)}</strong></div>}</div>
                   <button className="dismiss-button" onClick={() => dismissRecommendation(recommendation.recommendation_id)}>Dismiss <IonIcon icon={closeOutline} /></button>
-                </article>)}</div> : <div className="empty-inline insight-empty"><span className="empty-icon"><IonIcon icon={sparklesOutline} /></span><div><strong>Nothing to nag you about. Promise.</strong><p>When an appliance or usage pattern stands out, we’ll share a practical, personalized idea here.</p></div></div>}
-                <article className="reco-explainer"><IonIcon icon={checkmarkCircleOutline} /><p>Our suggestions are based on your wattage, household rate, and saved appliance schedules. Any potential savings shown are estimates, not guarantees.</p></article>
-                <footer className="page-footer">ENERGEIA<span>·</span> Good habits grow quietly.</footer>
+                </article>)}</div> : <div className="empty-inline insight-empty"><span className="empty-icon"><IonIcon icon={sparklesOutline} /></span><div><strong>No recommendations yet.</strong></div></div>}
+                {!!recommendations.length && <p className="recommendation-note">Potential savings are estimates, not guarantees.</p>}
               </section>}
 
               {page === 'scenarios' && <section className="view">
-                <article className="scenario-intro"><div className="scenario-orb"><IonIcon icon={bulbOutline} /><span>✳</span></div><div><span className="eyebrow">A GENTLE EXPERIMENT</span><h2>Change the hours.<br />Keep the what-ifs.</h2><p>Try a smaller schedule, a different quantity, or both. See the estimated difference—without touching what your household actually uses.</p><button className="text-action scenario-create" onClick={() => openModal('scenario-create')} disabled={!appliances.length}><IonIcon icon={addOutline} /> Make a what-if plan <IonIcon icon={chevronForwardOutline} /></button></div></article>
-                <div className="section-row"><div><span className="eyebrow section-eyebrow">AN IDEA ISN’T A COMMITMENT</span><h2>Your saved plans</h2></div><span className="plain-meta">{scenarios.length} {scenarios.length === 1 ? 'plan' : 'plans'}</span></div>
+                <p className="scenario-instruction">Adjust appliance usage to compare estimated costs. Preview changes do not affect your schedules unless you save them.</p>
+                <div className="scenario-actions"><button className="text-action scenario-create" onClick={() => openModal('scenario-create')} disabled={!appliances.length}><IonIcon icon={addOutline} /> Make a plan</button></div>
+                <div className="section-row"><div><h2>Saved plans</h2></div><span className="plain-meta">{scenarios.length}</span></div>
                 {scenarios.length ? <div className="scenario-layout"><div className="scenario-list">{scenarios.map((scenario, index) => <article className={`scenario-row${activeScenario?.scenario_id === scenario.scenario_id ? ' scenario-row-active' : ''}`} key={scenario.scenario_id}><button className="scenario-open" onClick={() => showScenario(scenario)}><span className={`scenario-index scenario-index-${index % 3}`}>0{index + 1}</span><span className="scenario-row-copy"><strong>{scenario.scenario_name}</strong><span>Saved {new Date(`${scenario.created_at}Z`).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' })}</span></span><span className="scenario-row-result">{fmtMoney(scenario.scenario_cost)}<span>estimated bill</span></span><IonIcon icon={chevronForwardOutline} /></button><button className="icon-button delete-button" aria-label={`Delete ${scenario.scenario_name}`} onClick={() => deleteScenario(scenario)}><IonIcon icon={trashOutline} /></button></article>)}</div>
-                  {scenarioResults && <article className="scenario-result"><div className="eyebrow">A GENTLE COMPARISON</div><h3>{scenarioResults.scenario_name || activeScenario?.scenario_name || 'Quick preview'}</h3><div className="compare-item"><span>Current estimated bill</span><strong>{fmtMoney(scenarioResults.current_cost)}</strong><small>{fmtKwh(scenarioResults.current_kwh)} kWh</small></div><div className="compare-item compare-proposed"><span>What-if estimated bill</span><strong>{fmtMoney(scenarioResults.scenario_cost)}</strong><small>{fmtKwh(scenarioResults.scenario_kwh)} kWh</small></div><div className={`compare-difference${Number(scenarioResults.savings_cost) >= 0 ? '' : ' compare-increase'}`}><IonIcon icon={Number(scenarioResults.savings_cost) >= 0 ? trendingDownOutline : arrowUpOutline} /><span>{Number(scenarioResults.savings_cost) >= 0 ? 'Potential savings' : 'Potential increase'}</span><strong>{fmtMoney(Math.abs(Number(scenarioResults.savings_cost)))}</strong></div>
+                  {scenarioResults && <article className="scenario-result"><h3>Comparison</h3><div className="compare-item"><span>Current estimated bill</span><strong>{fmtMoney(scenarioResults.current_cost)}</strong><small>{fmtKwh(scenarioResults.current_kwh)} kWh</small></div><div className="compare-item compare-proposed"><span>What-if estimated bill</span><strong>{fmtMoney(scenarioResults.scenario_cost)}</strong><small>{fmtKwh(scenarioResults.scenario_kwh)} kWh</small></div><div className={`compare-difference${Number(scenarioResults.savings_cost) >= 0 ? '' : ' compare-increase'}`}><IonIcon icon={Number(scenarioResults.savings_cost) >= 0 ? trendingDownOutline : arrowUpOutline} /><span>{Number(scenarioResults.savings_cost) >= 0 ? 'Potential savings' : 'Potential increase'}</span><strong>{fmtMoney(Math.abs(Number(scenarioResults.savings_cost)))}</strong></div>
                       {scenarioResults.items?.length > 0 && <div className="scenario-saved-items"><div className="eyebrow">SAVED ADJUSTMENTS</div>{scenarioResults.items.map((item) => <div key={item.appliance_id}><span>{item.appliance_name}</span><strong>{item.adjusted_hours_per_day != null ? `${Number(item.adjusted_hours_per_day)} hrs/day` : 'Current hours'}<span> · </span>{item.adjusted_quantity != null ? `${item.adjusted_quantity} units` : 'Current quantity'}</strong></div>)}</div>}</article>}
-                </div> : <div className="empty-inline scenario-empty"><span className="empty-icon"><IonIcon icon={bulbOutline} /></span><div><strong>Just a little room to imagine.</strong><p>Add at least one appliance to start exploring changes without changing your actual usage.</p></div>{appliances.length > 0 && <button className="plain-link" onClick={() => openModal('scenario-create')}>Make a plan <IonIcon icon={chevronForwardOutline} /></button>}</div>}
-                {scenarioResults && appliances.length > 0 && <><div className="section-row scenario-edit-heading"><div><span className="eyebrow section-eyebrow">NOT READY TO SAVE?</span><h2>Try changing a few things</h2></div><span className="plain-meta">Just a preview. Nothing is saved.</span></div><form className="scenario-preview-card" onSubmit={runScenario}><div className="preview-head"><span>APPLIANCE</span><span>HOURS / DAY</span><span>QUANTITY</span></div>{appliances.map((appliance) => <div className="preview-row" key={appliance.appliance_id}><strong>{appliance.appliance_name}</strong><label><span>HOURS / DAY</span><input className="small-native-input" type="number" name={`scenario_hours_${appliance.appliance_id}`} min="0" max="24" step=".25" placeholder={String(Number(appliance.average_hours_per_day || 0).toFixed(1))} /></label><label><span>QUANTITY</span><input className="small-native-input" type="number" name={`scenario_quantity_${appliance.appliance_id}`} min="1" step="1" placeholder={String(appliance.quantity)} /></label></div>)}<div className="preview-actions"><span>Leave a field empty to keep the current setting.</span><button type="submit" className="plain-link"><IonIcon icon={playOutline} /> Preview changes</button></div></form></>}
-                <footer className="page-footer">ENERGEIA<span>·</span> Your scenarios are just possibilities, never changes to your real data.</footer>
+                </div> : <div className="empty-inline scenario-empty"><span className="empty-icon"><IonIcon icon={bulbOutline} /></span><div><strong>No plans yet.</strong><p>Create a plan to compare costs without changing your appliance schedules.</p></div>{appliances.length > 0 && <button className="plain-link" onClick={() => openModal('scenario-create')}>Make a plan <IonIcon icon={chevronForwardOutline} /></button>}</div>}
+                {scenarioResults && appliances.length > 0 && <><div className="section-row scenario-edit-heading"><div><h2>Preview adjustments</h2></div><span className="plain-meta">Changes are not saved.</span></div><form className="scenario-preview-card" onSubmit={runScenario}><div className="preview-head"><span>Appliance</span><span>Hours / day</span><span>Quantity</span></div>{appliances.map((appliance) => <div className="preview-row" key={appliance.appliance_id}><strong>{appliance.appliance_name}</strong><label><span>Hours / day</span><input className="small-native-input" type="number" name={`scenario_hours_${appliance.appliance_id}`} min="0" max="24" step=".25" placeholder={String(Number(appliance.average_hours_per_day || 0).toFixed(1))} /></label><label><span>Quantity</span><input className="small-native-input" type="number" name={`scenario_quantity_${appliance.appliance_id}`} min="1" step="1" placeholder={String(appliance.quantity)} /></label></div>)}<div className="preview-actions"><span>Leave a field empty to keep its current setting.</span><button type="submit" className="plain-link"><IonIcon icon={playOutline} /> Preview changes</button></div></form></>}
               </section>}
             </div>
           </main>
@@ -652,7 +653,7 @@ function App() {
       </IonContent>
       <IonToast isOpen={!!notice} message={notice} duration={3000} position="top" onDidDismiss={() => setNotice('')} />
 
-      <Modal isOpen={modal === 'appliance'} onClose={() => setModal('')} title={editingAppliance ? 'A small change.' : 'What keeps your home humming?'} subtitle={editingAppliance ? 'Update your appliance details; its saved history stays right where it is.' : 'A name and a little detail. You can add or change the schedule next.'}>
+      <Modal isOpen={modal === 'appliance'} onClose={() => setModal('')} title={editingAppliance ? 'Edit appliance' : 'Add appliance'} subtitle={editingAppliance ? 'Saved usage history will be preserved.' : 'Add a schedule after saving to estimate usage.'}>
         <ModalForm busy={busy} error={error} onSubmit={saveAppliance} button={editingAppliance ? 'Save changes' : 'Add appliance'}>
           <Field label="Appliance name"><IonInput className="form-input" name="appliance_name" placeholder="e.g. Living room air conditioner" value={formFields.appliance_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
           <div className="form-row"><Field label="Category"><IonSelect className="form-input form-select" name="category" value={formFields.category ?? 'Cooling'} onIonChange={updateFormField} interface="popover">{CATEGORIES.map((category) => <IonSelectOption key={category} value={category}>{category}</IonSelectOption>)}</IonSelect></Field><Field label="Wattage"><IonInput className="form-input" name="wattage" type="number" min="0.01" max="100000" step="any" placeholder="e.g. 950" value={formFields.wattage ?? ''} onIonInput={updateFormField} required /><span className="field-hint">Look for the W rating on the label.</span></Field></div>
@@ -660,7 +661,7 @@ function App() {
         </ModalForm>
       </Modal>
 
-      <Modal isOpen={modal === 'schedule'} onClose={() => setModal('')} title={editingSchedule ? 'A little rhythm.' : 'When does it run?'} subtitle={`${activeScenario?.appliance_name || 'Your appliance'} · Add different schedules for weekdays and weekends, if you’d like.`}>
+      <Modal isOpen={modal === 'schedule'} onClose={() => setModal('')} title={editingSchedule ? 'Edit schedule' : 'Add usage schedule'} subtitle={activeScenario?.appliance_name || 'Appliance'}>
         <ModalForm busy={busy} error={error} key={`${editingSchedule?.schedule_id || activeScenario?.appliance_id || 'new'}`} onSubmit={saveSchedule} button="Save schedule">
           <div className="field-label">Days of the week<div className="weekday-grid">{WEEKDAYS.map((day) => { const checked = editingSchedule?.days_of_week.includes(day) ?? false; return <label className="weekday-chip" key={day}><input type="checkbox" name="days" value={day} defaultChecked={checked} /><span>{day.slice(0, 1)}</span><small>{day}</small></label>; })}</div></div>
           <Field label="Operating hours per day" hint="An estimate is just fine. Add another schedule if the hours change on different days."><IonInput className="form-input" name="hours_per_day" type="number" min="0.25" max="24" step="0.25" placeholder="e.g. 8" value={formFields.hours_per_day ?? ''} onIonInput={updateFormField} required /></Field>
@@ -669,32 +670,32 @@ function App() {
         </ModalForm>
       </Modal>
 
-      <Modal isOpen={modal === 'household'} onClose={() => { setModal(''); setEditingHousehold(null); }} title={editingHousehold ? 'A name that feels like yours.' : 'Another home, another story.'} subtitle="You can keep multiple households and their electricity rates neatly separate.">
+      <Modal isOpen={modal === 'household'} onClose={() => { setModal(''); setEditingHousehold(null); }} title={editingHousehold ? 'Edit household' : 'Add household'}>
         <ModalForm busy={busy} error={error} onSubmit={saveHousehold} button={editingHousehold ? 'Save household details' : 'Add household'}>
           <Field label="Household name"><IonInput className="form-input" name="household_name" placeholder="e.g. Weekend cottage" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
           <Field label="Address"><IonInput className="form-input" name="address" placeholder="City or neighbourhood (optional)" value={formFields.address ?? ''} onIonInput={updateFormField} maxlength={255} /></Field>
         </ModalForm>
       </Modal>
 
-      <Modal isOpen={modal === 'account'} onClose={() => setModal('')} title="Your little corner of Energeia." subtitle="A personal space, just for your household data.">
+      <Modal isOpen={modal === 'account'} onClose={() => setModal('')} title="Account">
         <div className="account-card-content"><span className="account-detail-avatar">{signedInInitial}</span><div className="account-detail"><span className="eyebrow">YOUR ACCOUNT</span><strong>{user.full_name}</strong><span>{user.email}</span></div></div>
         <button className="logout-modal-button" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out of Energeia</button>
       </Modal>
 
-      <Modal isOpen={modal === 'rate'} onClose={() => setModal('')} title="Every provider has its own rate." subtitle="Changing providers makes a new rate; your past bills always keep theirs.">
+      <Modal isOpen={modal === 'rate'} onClose={() => setModal('')} title="Electricity rate" subtitle="Saved bills keep their original rate.">
         <ModalForm busy={busy} error={error} onSubmit={saveRate} button="Save electricity rate" note={Number(selectedRate?.rate_per_kwh) > 0 ? `Current: ${selectedRate.provider_name} · ₱${Number(selectedRate.rate_per_kwh).toFixed(2)} per kWh` : 'Your first provider and rate will be used in future bill estimates.'}>
           <Field label="Electricity provider"><IonInput className="form-input" name="provider_name" placeholder="e.g. Meralco" value={formFields.provider_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
           <Field label="Rate per kilowatt-hour (₱/kWh)" hint="Usually listed on your electricity bill."><IonInput className="form-input" name="rate_per_kwh" type="number" min="0.0001" max="999999" step=".0001" placeholder="e.g. 11.5000" value={formFields.rate_per_kwh ?? ''} onIonInput={updateFormField} required /></Field>
         </ModalForm>
       </Modal>
 
-      <Modal isOpen={modal === 'actual-bill'} onClose={() => setModal('')} title="The real number, whenever you’re ready." subtitle={`Add your electricity bill for ${activeScenario?.period_start || ''} — your estimate stays saved alongside it.`}>
+      <Modal isOpen={modal === 'actual-bill'} onClose={() => setModal('')} title="Add actual bill" subtitle={`Your estimate for ${activeScenario?.period_start || ''} will be kept.`}>
         <ModalForm busy={busy} error={error} onSubmit={saveActualBill} button="Save actual bill">
           <Field label="Actual bill amount (₱)"><IonInput className="form-input" name="actual_bill_amount" type="number" min="0" max="999999999" step=".01" placeholder="e.g. 2,486.50" value={formFields.actual_bill_amount ?? ''} onIonInput={updateFormField} required /></Field>
         </ModalForm>
       </Modal>
 
-      <Modal isOpen={modal === 'scenario-create'} onClose={() => setModal('')} title="An idea worth playing with." subtitle="Change a few hours or quantities below. We’ll only save your real appliances if you choose to save this plan.">
+      <Modal isOpen={modal === 'scenario-create'} onClose={() => setModal('')} title="Save what-if plan" subtitle="Saving a plan does not change appliance schedules.">
         <ModalForm busy={busy} error={error} onSubmit={saveScenario} button="Save my what-if plan">
           <Field label="Give your idea a name"><IonInput className="form-input" name="scenario_name" placeholder="e.g. Quieter air-con evenings" value={formFields.scenario_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
           {appliances.map((appliance) => <div className="scenario-form-appliance" key={appliance.appliance_id}><strong>{appliance.appliance_name}</strong><div><label className="inline-field">Hours/day<input className="small-native-input" type="number" name={`hours_${appliance.appliance_id}`} min="0" max="24" step=".25" placeholder={Number(appliance.average_hours_per_day || 0).toFixed(1)} /></label><label className="inline-field">Quantity<input className="small-native-input" type="number" name={`quantity_${appliance.appliance_id}`} min="1" max="999" step="1" placeholder={String(appliance.quantity)} /></label></div><span>Leave blank to keep the current setting.</span></div>)}

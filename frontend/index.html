@@ -22,7 +22,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <script>
       const savedTheme = localStorage.getItem('energeia_theme');
-      document.documentElement.dataset.theme = savedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      const preferredTheme = savedTheme === 'dark' || savedTheme === 'light'
+        ? savedTheme
+        : (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.dataset.theme = preferredTheme;
     </script>
   </head>
   <body>
