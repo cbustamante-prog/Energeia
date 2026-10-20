@@ -14,16 +14,19 @@ describe('Energeia', () => {
   it('welcomes new visitors with the sign-in form', async () => {
     const { container } = render(<App />);
 
-    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeTruthy();
     expect(container.querySelector('.brand-image')?.getAttribute('src')).toBe('/energeia-logo.png');
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue with GitHub' })).toBeTruthy();
   });
 
   it('lets a visitor switch to account registration', async () => {
     render(<App />);
-    fireEvent.click(screen.getByRole('button', { name: 'Create your account' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign up' }));
 
     expect(await screen.findByRole('heading', { name: 'Create your account' })).toBeTruthy();
-    expect(screen.getByText('Your name')).toBeTruthy();
+    expect(screen.getByText('First name')).toBeTruthy();
+    expect(screen.getByText('Confirm password')).toBeTruthy();
   });
 
   it('toggles and persists the selected color theme', () => {
@@ -71,7 +74,8 @@ describe('Energeia', () => {
     };
     const household = { household_id: 1, household_name: 'My home', address: 'Cebu City', rate_id: 1 };
     const responses = {
-      '/auth/me': { user_id: 1, full_name: 'Alex Rivera', email: 'alex@example.com' },
+      '/auth/me': { user_id: 1, full_name: 'Alex Rivera', email: 'alex@example.com', profile_complete: true },
+      '/auth/providers': { providers: [], password_enabled: true },
       '/households': [household],
       '/rates': [{ rate_id: 1, provider_name: 'Sample Utility', rate_per_kwh: 11.25 }],
       '/households/1/appliances': [],
@@ -96,7 +100,7 @@ describe('Energeia', () => {
 
     await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe('Home'));
     await waitFor(() => expect(container.querySelector('.metric-card-primary strong')?.textContent).toContain('75.2'));
-    expect(container.querySelectorAll('.mobile-nav-item')).toHaveLength(5);
+    expect(container.querySelectorAll('.mobile-nav-item')).toHaveLength(6);
 
     const menuButton = container.querySelector('.menu-toggle');
     expect(menuButton?.getAttribute('aria-expanded')).toBe('false');
@@ -113,6 +117,7 @@ describe('Energeia', () => {
       ['Usage', 'Usage & Bills'],
       ['Insights', 'Energy Tips'],
       ['Planner', 'What-if Planner'],
+      ['Account', 'Account settings'],
       ['Home', 'Home'],
     ]) {
       fireEvent.click(screen.getByRole('button', { name: navLabel }));

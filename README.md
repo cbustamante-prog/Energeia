@@ -4,7 +4,8 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 
 ## Features
 
-- Personal registration, sign-in, sign-out, and password hashing.
+- Email/password registration and sign-in, Google/GitHub OAuth, profile completion, and password reset.
+- Private account profile and home-location settings; addresses are not shown on the dashboard.
 - Private, multiple household profiles and configurable electricity providers and rates.
 - Editable appliances and multiple active or paused schedules per appliance.
 - Period-specific kilowatt-hour and estimated-bill calculations.
@@ -13,6 +14,8 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 - Saved what-if plans and previews that do not change your real appliance data.
 - Access controls so one account cannot read another account's households.
 - Historical electricity-rate snapshots; appliances with history are archived instead of deleted.
+
+For existing database migrations and Google/GitHub, SMTP, and Vercel configuration, see [AUTH-SETUP.md](./AUTH-SETUP.md). OAuth credentials and SMTP secrets belong only in the FastAPI host environment, never in frontend or Vercel `VITE_*` variables.
 
 ## Run locally with Supabase
 
@@ -56,6 +59,8 @@ When adapting the connection string from Supabase, use the SQLAlchemy driver pre
 Open [http://localhost:8000/docs](http://localhost:8000/docs) for the interactive API and [http://localhost:8000/api/health](http://localhost:8000/api/health) to check its connection to PostgreSQL.
 
 The API expects the tables from `backend/schema.sql` to exist; it does not create or migrate them automatically. Keep the database connection string and `JWT_SECRET` private. Never put the database URL in the frontend or commit `.env`. Before deploying outside a local development computer, set `JWT_SECRET` to a new, long, random secret, restrict `CORS_ORIGINS`, and use HTTPS.
+
+If you are upgrading an existing PostgreSQL database, do not rerun the entire schema script: follow the safe migration steps in [AUTH-SETUP.md](./AUTH-SETUP.md).
 
 ### 4. Start the Ionic + React app
 

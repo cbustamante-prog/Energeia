@@ -7,7 +7,8 @@ import {
   addOutline, arrowDownOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
   checkmarkCircleOutline, chevronDownOutline, chevronForwardOutline, closeOutline,
   createOutline, flashOutline, gridOutline, homeOutline, leafOutline, logOutOutline,
-  menuOutline, moonOutline, playOutline, pulseOutline, sparklesOutline, sunnyOutline, timeOutline, trashOutline,
+  logoGithub, logoGoogle, menuOutline, moonOutline, playOutline, pulseOutline,
+  settingsOutline, sparklesOutline, sunnyOutline, timeOutline, trashOutline,
   trendingDownOutline, waterOutline,
 } from 'ionicons/icons';
 import { fmtKwh, fmtMoney, request } from './api.js';
@@ -20,6 +21,7 @@ const NAV = [
   { id: 'history', label: 'Usage & Bills', mobileLabel: 'Usage', icon: pulseOutline },
   { id: 'insights', label: 'Energy Tips', mobileLabel: 'Insights', icon: sparklesOutline },
   { id: 'scenarios', label: 'What-if Planner', mobileLabel: 'Planner', icon: bulbOutline },
+  { id: 'settings', label: 'Account settings', mobileLabel: 'Account', icon: settingsOutline },
 ];
 const CATEGORIES = ['Cooling', 'Kitchen', 'Laundry', 'Lighting', 'Electronics', 'Water heating', 'Other'];
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -45,11 +47,20 @@ function ThemeToggle({ darkMode, onToggle }) {
   );
 }
 
-function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
-  const [registering, setRegistering] = useState(false);
+function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }) {
+  const [view, setView] = useState(resetToken ? 'reset' : 'login');
+  const [registrationStep, setRegistrationStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [credentials, setCredentials] = useState({ full_name: '', email: '', password: '' });
+  const [success, setSuccess] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [credentials, setCredentials] = useState({
+    first_name: '', middle_name: '', last_name: '', email: '', password: '',
+    password_confirmation: '', country: '', region: '', city: '', barangay: '',
+    street_address: '', unit_number: '', postal_code: '', phone_number: '',
+    terms_accepted: false,
+  });
+  const registering = view === 'register';
 
   function updateCredential(event) {
     const field = event.currentTarget.name;
@@ -57,17 +68,61 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
     setCredentials((previous) => ({ ...previous, [field]: value }));
   }
 
-  async function submit(event) {
-    event.preventDefault();
+  async function beginOAuth(provider) {
     setLoading(true);
     setError('');
     try {
-      const result = await request(`/auth/${registering ? 'register' : 'login'}`, {
-        method: 'POST',
-        body: credentials,
-      });
-      localStorage.setItem('energeia_token', result.access_token);
-      onLogin(result.user);
+      const result = await request(`/auth/oauth/${provider}/start`, { method: 'POST' });
+      window.location.assign(result.authorization_url);
+    } catch (exception) {
+      setError(exception.message);
+      setLoading(false);
+    }
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    if (registering && registrationStep === 1) {
+      if (credentials.password !== credentials.password_confirmation) {
+        setError('Passwords do not match.');
+        return;
+      }
+      setError('');
+      setRegistrationStep(2);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      if (view === 'forgot') {
+        const result = await request('/auth/password-reset/request', {
+          method: 'POST',
+          body: { email: credentials.email },
+        });
+        setSuccess(result.message);
+      } else if (view === 'reset') {
+        const result = await request('/auth/password-reset/complete', {
+          method: 'POST',
+          body: {
+            token: resetToken,
+            password: credentials.password,
+            password_confirmation: credentials.password_confirmation,
+          },
+        });
+        setSuccess(result.message);
+        setView('login');
+      } else {
+        const result = await request(`/auth/${registering ? 'register' : 'login'}`, {
+          method: 'POST',
+          body: registering ? credentials : {
+            email: credentials.email,
+            password: credentials.password,
+          },
+        });
+        localStorage.setItem('energeia_token', result.access_token);
+        onLogin(result.user);
+      }
     } catch (exception) {
       setError(exception.message);
     } finally {
@@ -75,28 +130,77 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme }) {
     }
   }
 
+  const title = {
+    login: 'Welcome back',
+    register: 'Create your account',
+    forgot: 'Reset your password',
+    reset: 'Choose a new password',
+  }[view];
+
+  function changeView(nextView) {
+    setView(nextView);
+    setRegistrationStep(1);
+    setError('');
+    setSuccess('');
+  }
+
   return (
     <main className="auth-page">
       <div className="auth-left">
         <Logo />
-        <div className="auth-pitch">
-          <h1>Home energy,<br /><span>made clear.</span></h1>
-          <p>Track appliance use and estimated bills in one place.</p>
-        </div>
       </div>
       <div className="auth-right">
-        <form className="auth-card" onSubmit={submit}>
+        <form className={`auth-card auth-card-${view}`} onSubmit={submit}>
           <div className="auth-mini"><Logo small /><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} /></div>
-          <div className="auth-welcome"><h2>{registering ? 'Create your account' : 'Sign in'}</h2></div>
-          {registering && <label className="field-label">Your name<IonInput className="form-input" name="full_name" placeholder="e.g. Alex Santos" autocomplete="name" value={credentials.full_name} onIonInput={updateCredential} required maxlength={150} /></label>}
-          <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
-          <label className="field-label">Password<IonInput className="form-input" name="password" type="password" placeholder={registering ? 'At least 8 characters' : 'Enter your password'} autocomplete={registering ? 'new-password' : 'current-password'} value={credentials.password} onIonInput={updateCredential} required minlength={registering ? 8 : 1} maxlength={128} /></label>
-          {error && <div className="inline-error">{error}</div>}
+          <div className="auth-welcome"><h2>{title}</h2></div>
+          {!['forgot', 'reset'].includes(view) && <>
+            <button className="social-auth-button" type="button" onClick={() => beginOAuth('google')} disabled={loading}>
+              <IonIcon icon={logoGoogle} /> Continue with Google
+            </button>
+            <button className="social-auth-button" type="button" onClick={() => beginOAuth('github')} disabled={loading}>
+              <IonIcon icon={logoGithub} /> Continue with GitHub
+            </button>
+            <div className="auth-divider"><span>or</span></div>
+          </>}
+          {registering && registrationStep === 2 && <div className="auth-progress" aria-label="Registration step 2 of 2">Step 2 of 2 · Home address</div>}
+          {registering && registrationStep === 1 && <div className="auth-form-grid">
+            <label className="field-label">First name<IonInput className="form-input" name="first_name" autocomplete="given-name" value={credentials.first_name} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Last name<IonInput className="form-input" name="last_name" autocomplete="family-name" value={credentials.last_name} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Middle name <span className="field-hint">Optional</span><IonInput className="form-input" name="middle_name" autocomplete="additional-name" value={credentials.middle_name} onIonInput={updateCredential} maxlength={100} /></label>
+            <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
+            <label className="field-label">Password<div className="password-input-wrap"><IonInput className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password} onIonInput={updateCredential} required minlength={8} maxlength={128} /><button className="password-visibility" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
+            <label className="field-label">Confirm password<IonInput className="form-input" name="password_confirmation" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password_confirmation} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
+          </div>}
+          {registering && registrationStep === 2 && <div className="auth-form-grid">
+            <label className="field-label">Country<IonInput className="form-input" name="country" autocomplete="country-name" value={credentials.country} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Province / State / Region<IonInput className="form-input" name="region" autocomplete="address-level1" value={credentials.region} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">City / Municipality<IonInput className="form-input" name="city" autocomplete="address-level2" value={credentials.city} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Barangay <span className="field-hint">Optional</span><IonInput className="form-input" name="barangay" value={credentials.barangay} onIonInput={updateCredential} maxlength={100} /></label>
+            <label className="field-label auth-grid-full">Street address<IonInput className="form-input" name="street_address" autocomplete="street-address" value={credentials.street_address} onIonInput={updateCredential} required maxlength={255} /></label>
+            <label className="field-label">House / Unit <span className="field-hint">Optional</span><IonInput className="form-input" name="unit_number" value={credentials.unit_number} onIonInput={updateCredential} maxlength={100} /></label>
+            <label className="field-label">Postal code <span className="field-hint">Optional</span><IonInput className="form-input" name="postal_code" autocomplete="postal-code" value={credentials.postal_code} onIonInput={updateCredential} maxlength={32} /></label>
+            <label className="field-label">Phone number <span className="field-hint">Optional</span><IonInput className="form-input" name="phone_number" type="tel" autocomplete="tel" value={credentials.phone_number} onIonInput={updateCredential} maxlength={32} /></label>
+            <label className="consent-field auth-grid-full"><input type="checkbox" name="terms_accepted" checked={credentials.terms_accepted} onChange={(event) => setCredentials((previous) => ({ ...previous, terms_accepted: event.target.checked }))} required /><span>I agree to the Terms of Service and Privacy Policy.</span></label>
+            <p className="address-privacy-note auth-grid-full">Your home location helps personalize household energy settings. Your full address is private and is not shown on the dashboard.</p>
+          </div>}
+          {view === 'login' && <>
+            <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
+            <label className="field-label">Password<div className="password-input-wrap"><IonInput className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="current-password" value={credentials.password} onIonInput={updateCredential} required maxlength={128} /><button className="password-visibility" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
+            <button className="forgot-password-link" type="button" onClick={() => changeView('forgot')}>Forgot password?</button>
+          </>}
+          {view === 'forgot' && <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>}
+          {view === 'reset' && <>
+            <label className="field-label">New password<IonInput className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
+            <label className="field-label">Confirm new password<IonInput className="form-input" name="password_confirmation" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password_confirmation} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
+          </>}
+          {oauthError && <div className="inline-error">{oauthError}</div>}
+          {error && <div className="inline-error" role="alert">{error}</div>}
+          {success && <div className="form-note" role="status">{success}</div>}
+          {registering && registrationStep === 2 && <button className="text-button auth-back" type="button" onClick={() => setRegistrationStep(1)}>Back to personal information</button>}
           <IonButton type="submit" expand="block" className="primary-button auth-submit" disabled={loading}>
-            {loading ? <IonSpinner name="crescent" /> : <>{registering ? 'Create my account' : 'Sign in'} <IonIcon icon={chevronForwardOutline} slot="end" /></>}
+            {loading ? <IonSpinner name="crescent" /> : <>{registering ? (registrationStep === 1 ? 'Continue' : 'Create Account') : view === 'login' ? 'Sign In' : view === 'forgot' ? 'Send reset link' : 'Update password'} <IonIcon icon={chevronForwardOutline} slot="end" /></>}
           </IonButton>
-          <div className="auth-divider"><span /></div>
-          <p className="auth-switch">{registering ? 'Already have an account?' : 'New to Energeia?'} <button className="text-button" type="button" onClick={() => { setRegistering(!registering); setError(''); }}>{registering ? 'Sign in' : 'Create your account'}</button></p>
+          {view === 'login' || registering ? <p className="auth-switch">{registering ? 'Already have an account?' : "Don't have an account?"} <button className="text-button" type="button" onClick={() => changeView(registering ? 'login' : 'register')}>{registering ? 'Sign in' : 'Sign up'}</button></p> : <p className="auth-switch"><button className="text-button" type="button" onClick={() => changeView('login')}>Back to sign in</button></p>}
         </form>
       </div>
     </main>
@@ -120,6 +224,121 @@ function Field({ label, children, hint }) {
   return <label className="field-label">{label}{children}{hint && <span className="field-hint">{hint}</span>}</label>;
 }
 
+function ProfileEditor({ user, onSave, saving, error, showConsent = false }) {
+  const [profile, setProfile] = useState(() => ({
+    first_name: user.first_name || '',
+    middle_name: user.middle_name || '',
+    last_name: user.last_name || '',
+    country: user.country || '',
+    region: user.region || '',
+    city: user.city || '',
+    barangay: user.barangay || '',
+    street_address: user.street_address || '',
+    unit_number: user.unit_number || '',
+    postal_code: user.postal_code || '',
+    phone_number: user.phone_number || '',
+    terms_accepted: Boolean(user.terms_accepted),
+  }));
+
+  function update(event) {
+    const { name, value, checked, type } = event.currentTarget;
+    setProfile((previous) => ({
+      ...previous,
+      [name]: type === 'checkbox' ? checked : event.detail?.value ?? value,
+    }));
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+    try {
+      await onSave(profile);
+    } catch {
+      // The parent keeps the API error visible on the form.
+    }
+  }
+
+  return (
+    <form className="profile-form" onSubmit={submit}>
+      <div className="profile-form-grid">
+        <Field label="First name"><IonInput className="form-input" name="first_name" autocomplete="given-name" value={profile.first_name} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Middle name (optional)"><IonInput className="form-input" name="middle_name" autocomplete="additional-name" value={profile.middle_name} onIonInput={update} maxlength={100} /></Field>
+        <Field label="Last name"><IonInput className="form-input" name="last_name" autocomplete="family-name" value={profile.last_name} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Country"><IonInput className="form-input" name="country" autocomplete="country-name" value={profile.country} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Province / State / Region"><IonInput className="form-input" name="region" autocomplete="address-level1" value={profile.region} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="City / Municipality"><IonInput className="form-input" name="city" autocomplete="address-level2" value={profile.city} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Barangay (optional)"><IonInput className="form-input" name="barangay" value={profile.barangay} onIonInput={update} maxlength={100} /></Field>
+        <Field label="Street address"><IonInput className="form-input" name="street_address" autocomplete="street-address" value={profile.street_address} onIonInput={update} required maxlength={255} /></Field>
+        <Field label="House / Unit number (optional)"><IonInput className="form-input" name="unit_number" value={profile.unit_number} onIonInput={update} maxlength={100} /></Field>
+        <Field label="Postal code (optional)"><IonInput className="form-input" name="postal_code" autocomplete="postal-code" value={profile.postal_code} onIonInput={update} maxlength={32} /></Field>
+        <Field label="Phone number (optional)"><IonInput className="form-input" name="phone_number" type="tel" autocomplete="tel" value={profile.phone_number} onIonInput={update} maxlength={32} /></Field>
+      </div>
+      <p className="address-privacy-note">Your home location helps personalize household energy settings. Your full address is private and is not shown on the dashboard.</p>
+      {showConsent && <label className="consent-field"><input type="checkbox" name="terms_accepted" checked={profile.terms_accepted} onChange={update} required /><span>I agree to the Terms of Service and Privacy Policy.</span></label>}
+      {error && <div className="inline-error" role="alert">{error}</div>}
+      <IonButton type="submit" expand="block" className="primary-button" disabled={saving}>
+        {saving ? <IonSpinner name="crescent" /> : <>Save and Continue <IonIcon icon={chevronForwardOutline} slot="end" /></>}
+      </IonButton>
+    </form>
+  );
+}
+
+function AccountSettings({ user, providers, onSave, onConnect, onChangePassword, saving, error }) {
+  const [password, setPassword] = useState({
+    current_password: '', password: '', password_confirmation: '',
+  });
+  const [passwordMessage, setPasswordMessage] = useState('');
+  const [pendingProvider, setPendingProvider] = useState('');
+
+  async function connect(provider) {
+    setPendingProvider(provider);
+    await onConnect(provider);
+    setPendingProvider('');
+  }
+
+  async function submitPassword(event) {
+    event.preventDefault();
+    setPasswordMessage('');
+    try {
+      const message = await onChangePassword(password);
+      setPasswordMessage(message);
+      setPassword({ current_password: '', password: '', password_confirmation: '' });
+    } catch {
+      // The parent displays the API error.
+    }
+  }
+
+  return (
+    <div className="account-settings-grid">
+      <section className="settings-card">
+        <h2>Personal information</h2>
+        <p className="settings-email">Email address · {user.email}</p>
+        <ProfileEditor user={user} onSave={onSave} saving={saving} error={error} />
+      </section>
+      <section className="settings-card">
+        <h2>Sign-in methods</h2>
+        <p>Link another sign-in method only while signed in to this account.</p>
+        <div className="connected-methods">
+          {['google', 'github'].map((provider) => (
+            <div className="connected-method" key={provider}>
+              <span>{provider === 'google' ? <IonIcon icon={logoGoogle} /> : <IonIcon icon={logoGithub} />} {provider === 'google' ? 'Google' : 'GitHub'}</span>
+              {providers.includes(provider) ? <strong>Connected</strong> : <button className="text-button" type="button" disabled={!!pendingProvider} onClick={() => connect(provider)}>{pendingProvider === provider ? 'Connecting…' : 'Connect'}</button>}
+            </div>
+          ))}
+          <div className="connected-method"><span>Email and password</span><strong>{providers.includes('password') ? 'Connected' : 'Not set up'}</strong></div>
+        </div>
+        {providers.includes('password') && <form className="password-change-form" onSubmit={submitPassword}>
+          <h3>Change password</h3>
+          <Field label="Current password"><IonInput className="form-input" name="current_password" type="password" autocomplete="current-password" value={password.current_password} onIonInput={(event) => setPassword((previous) => ({ ...previous, current_password: event.detail?.value ?? '' }))} required /></Field>
+          <Field label="New password"><IonInput className="form-input" name="password" type="password" autocomplete="new-password" value={password.password} onIonInput={(event) => setPassword((previous) => ({ ...previous, password: event.detail?.value ?? '' }))} required minlength={8} maxlength={128} /></Field>
+          <Field label="Confirm new password"><IonInput className="form-input" name="password_confirmation" type="password" autocomplete="new-password" value={password.password_confirmation} onIonInput={(event) => setPassword((previous) => ({ ...previous, password_confirmation: event.detail?.value ?? '' }))} required minlength={8} maxlength={128} /></Field>
+          {passwordMessage && <p className="form-note" role="status">{passwordMessage}</p>}
+          <IonButton type="submit" className="primary-button" disabled={saving}>Update password</IonButton>
+        </form>}
+      </section>
+    </div>
+  );
+}
+
 function getInitialTheme() {
   const currentTheme = document.documentElement.dataset.theme;
   if (currentTheme === 'dark' || currentTheme === 'light') return currentTheme;
@@ -133,6 +352,8 @@ function App() {
   const darkMode = theme === 'dark';
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [oauthError, setOauthError] = useState('');
+  const [resetToken, setResetToken] = useState('');
   const [page, setPage] = useState('overview');
   const [households, setHouseholds] = useState([]);
   const [householdId, setHouseholdId] = useState('');
@@ -154,6 +375,7 @@ function App() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [connectedProviders, setConnectedProviders] = useState([]);
   const currentHousehold = households.find((item) => item.household_id === Number(householdId));
 
   const toggleTheme = useCallback(() => {
@@ -203,7 +425,28 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem('energeia_token');
+    const callback = new URLSearchParams(window.location.hash.slice(1));
+    const callbackToken = callback.get('access_token');
+    const callbackResetToken = callback.get('password_reset');
+    const callbackError = callback.get('oauth_error');
+    if (callbackToken) localStorage.setItem('energeia_token', callbackToken);
+    if (callbackResetToken) setResetToken(callbackResetToken);
+    if (callbackError) {
+      const messages = {
+        account_exists: 'An account with this email already exists. Sign in with that account, then connect this provider in Account settings.',
+        provider_already_linked: 'This provider is already connected to another Energeia account.',
+        account_conflict: 'That provider sign-in is already in use. Sign in to the existing account or contact support.',
+        sign_in_cancelled: 'Sign-in was cancelled.',
+        expired_state: 'The sign-in request expired. Please try again.',
+        invalid_state: 'The sign-in response could not be verified. Please try again.',
+        provider_failure: 'The provider could not complete sign-in. Check your verified provider email and try again.',
+      };
+      setOauthError(messages[callbackError] || 'Sign-in could not be completed. Please try again.');
+    }
+    if (callbackToken || callbackResetToken || callbackError) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+    const token = callbackToken || localStorage.getItem('energeia_token');
     if (!token) { setLoading(false); return; }
     request('/auth/me').then(setUser).catch(handleLogout).finally(() => setLoading(false));
   }, [handleLogout]);
@@ -261,17 +504,27 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.profile_complete) return;
     loadHouseholds().catch((exception) => { setError(exception.message); setLoading(false); });
   }, [user, loadHouseholds]);
 
   useEffect(() => {
-    if (!user || !householdId) return;
+    if (!user?.profile_complete || !householdId) return;
     setLoading(true);
     refresh(householdId, { calculate: true })
       .catch((exception) => setError(exception.message))
       .finally(() => setLoading(false));
   }, [user, householdId, refresh]);
+
+  useEffect(() => {
+    if (!user || page !== 'settings') return;
+    request('/auth/providers')
+      .then((result) => setConnectedProviders([
+        ...result.providers,
+        ...(result.password_enabled ? ['password'] : []),
+      ]))
+      .catch((exception) => setError(exception.message));
+  }, [user, page]);
 
   async function act(fn, { success, reload = true, calculate = false } = {}) {
     setBusy(true);
@@ -289,6 +542,50 @@ function App() {
     }
   }
 
+  async function saveProfile(profile) {
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await request('/auth/profile', {
+        method: 'PATCH',
+        body: profile,
+      });
+      setUser(updated);
+      setNotice('Your account information has been saved.');
+      return updated;
+    } catch (exception) {
+      setError(exception.message);
+      throw exception;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function connectProvider(provider) {
+    setError('');
+    try {
+      const result = await request(`/auth/providers/${provider}/start`, { method: 'POST' });
+      window.location.assign(result.authorization_url);
+    } catch (exception) {
+      setError(exception.message);
+    }
+  }
+
+  async function changePassword(password) {
+    setBusy(true);
+    setError('');
+    try {
+      const result = await request('/auth/password/change', { method: 'POST', body: password });
+      setNotice(result.message);
+      return result.message;
+    } catch (exception) {
+      setError(exception.message);
+      throw exception;
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function changePage(next) {
     setPage(next);
     setMenuOpen(false);
@@ -297,7 +594,18 @@ function App() {
   }
 
   if (loading && !user) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
-  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} darkMode={darkMode} onToggleTheme={toggleTheme} /></IonApp>;
+  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} darkMode={darkMode} onToggleTheme={toggleTheme} oauthError={oauthError} resetToken={resetToken} /></IonApp>;
+  if (!user.profile_complete) return <IonApp>
+    <main className="profile-completion-page">
+      <header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></div></header>
+      <section className="profile-completion-card">
+        <span className="eyebrow">One last step</span>
+        <h1>Complete your profile</h1>
+        <p>Your home location helps personalize household energy settings. The full address remains private.</p>
+        <ProfileEditor user={user} onSave={saveProfile} saving={busy} error={error} showConsent={!user.terms_accepted} />
+      </section>
+    </main>
+  </IonApp>;
   if (loading && !households.length) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
 
   const pageTitle = {
@@ -306,6 +614,7 @@ function App() {
     history: 'Usage & Bills',
     insights: 'Energy Tips',
     scenarios: 'What-if Planner',
+    settings: 'Account settings',
   }[page];
 
   const openCreateAppliance = () => { setEditingAppliance(null); openModal('appliance'); };
@@ -529,7 +838,7 @@ function App() {
               </button>)}
             </nav>
             <div className="sidebar-spacer" />
-            <div className="side-account"><span className="avatar">{signedInInitial}</span><span className="account-copy"><strong>{user?.full_name}</strong><span>Personal account</span></span><button className="account-out" title="Sign out" onClick={handleLogout}><IonIcon icon={logOutOutline} /></button></div>
+            <div className="side-account"><span className="avatar">{signedInInitial}</span><span className="account-copy"><strong>{user?.full_name || user?.email}</strong><span>Personal account</span></span><button className="account-out" title="Sign out" onClick={handleLogout}><IonIcon icon={logOutOutline} /></button></div>
           </aside>
           {menuOpen && <button className="sidebar-scrim" aria-label="Dismiss navigation menu" onClick={() => setMenuOpen(false)} />}
 
@@ -545,11 +854,11 @@ function App() {
                 }</select><IonIcon icon={chevronDownOutline} /></div>}
                 <button className="text-action" onClick={() => openModal('rate', Number(selectedRate?.rate_per_kwh) > 0 ? { provider_name: selectedRate.provider_name, rate_per_kwh: selectedRate.rate_per_kwh } : {})}><IonIcon icon={flashOutline} /> <span>{Number(selectedRate?.rate_per_kwh) > 0 ? 'Edit rate' : 'Set rate'}</span></button>
                 <button className="text-action" onClick={() => { setEditingHousehold(null); openModal('household'); }}><IonIcon icon={addOutline} /> <span>New home</span></button>
-                {currentHousehold && <button className="household-edit" title="Edit household details" onClick={() => { setEditingHousehold(currentHousehold); openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' }); }}><IonIcon icon={createOutline} /></button>}<ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><span className="header-divider" /><button className="header-avatar" aria-label={`Account: ${user?.full_name}`} title={user?.full_name} onClick={() => openModal('account')}>{signedInInitial}</button></div>
+                {currentHousehold && <button className="household-edit" title="Edit household details" onClick={() => { setEditingHousehold(currentHousehold); openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' }); }}><IonIcon icon={createOutline} /></button>}<ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><span className="header-divider" /><button className="header-avatar" aria-label={`Account: ${user?.full_name || user?.email}`} title={user?.full_name || user?.email} onClick={() => openModal('account')}>{signedInInitial}</button></div>
             </header>
 
             <div className="page-inner">
-              <section className="page-intro"><div><h1>{pageTitle}</h1><p>{currentHousehold?.address || currentHousehold?.household_name || 'Your household'} <span className="intro-dot">·</span> {PERIOD_LABEL}</p></div>
+              <section className="page-intro"><div><h1>{pageTitle}</h1><p>{currentHousehold?.household_name || 'Your household'} <span className="intro-dot">·</span> {PERIOD_LABEL}</p></div>
                 <div className="intro-actions"><span className="update-stamp"><IonIcon icon={calendarClearOutline} /> This billing period</span>
                   {page === 'appliances' && <IonButton className="primary-button compact-button" onClick={openCreateAppliance}><IonIcon icon={addOutline} slot="start" />Add appliance</IonButton>}</div>
               </section>
@@ -634,6 +943,19 @@ function App() {
                 </div> : <div className="empty-inline scenario-empty"><span className="empty-icon"><IonIcon icon={bulbOutline} /></span><div><strong>No plans yet.</strong><p>Create a plan to compare costs without changing your appliance schedules.</p></div>{appliances.length > 0 && <button className="plain-link" onClick={() => openModal('scenario-create')}>Make a plan <IonIcon icon={chevronForwardOutline} /></button>}</div>}
                 {scenarioResults && appliances.length > 0 && <><div className="section-row scenario-edit-heading"><div><h2>Preview adjustments</h2></div><span className="plain-meta">Changes are not saved.</span></div><form className="scenario-preview-card" onSubmit={runScenario}><div className="preview-head"><span>Appliance</span><span>Hours / day</span><span>Quantity</span></div>{appliances.map((appliance) => <div className="preview-row" key={appliance.appliance_id}><strong>{appliance.appliance_name}</strong><label><span>Hours / day</span><input className="small-native-input" type="number" name={`scenario_hours_${appliance.appliance_id}`} min="0" max="24" step=".25" placeholder={String(Number(appliance.average_hours_per_day || 0).toFixed(1))} /></label><label><span>Quantity</span><input className="small-native-input" type="number" name={`scenario_quantity_${appliance.appliance_id}`} min="1" step="1" placeholder={String(appliance.quantity)} /></label></div>)}<div className="preview-actions"><span>Leave a field empty to keep its current setting.</span><button type="submit" className="plain-link"><IonIcon icon={playOutline} /> Preview changes</button></div></form></>}
               </section>}
+              {page === 'settings' && <section className="view">
+                <div className="section-row"><div><h2>Account settings</h2></div></div>
+                <AccountSettings
+                  user={user}
+                  providers={connectedProviders}
+                  onSave={saveProfile}
+                  onConnect={connectProvider}
+                  onChangePassword={changePassword}
+                  saving={busy}
+                  error={error}
+                />
+                <button className="logout-modal-button settings-signout" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out of Energeia</button>
+              </section>}
             </div>
           </main>
           <nav className="mobile-nav" aria-label="Main navigation">
@@ -678,7 +1000,8 @@ function App() {
       </Modal>
 
       <Modal isOpen={modal === 'account'} onClose={() => setModal('')} title="Account">
-        <div className="account-card-content"><span className="account-detail-avatar">{signedInInitial}</span><div className="account-detail"><span className="eyebrow">YOUR ACCOUNT</span><strong>{user.full_name}</strong><span>{user.email}</span></div></div>
+        <div className="account-card-content"><span className="account-detail-avatar">{signedInInitial}</span><div className="account-detail"><span className="eyebrow">YOUR ACCOUNT</span><strong>{user.full_name || user.email}</strong><span>{user.email}</span></div></div>
+        <button className="text-button account-settings-link" onClick={() => { setModal(''); changePage('settings'); }}>Manage account settings</button>
         <button className="logout-modal-button" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out of Energeia</button>
       </Modal>
 

@@ -988,3 +988,67 @@ html[data-theme="dark"] .overview-stat>span:nth-child(2)>span{color:var(--text-m
 .recommendation-note{margin:12px 0 0;color:var(--text-muted);font-size:14px;line-height:1.5}
 .scenario-instruction{margin:0 0 12px;color:var(--text-muted);font-size:15px;line-height:1.55}
 .scenario-actions{margin-bottom:18px}
+.auth-page{background:var(--surface-soft);color:var(--text)}
+.auth-left{min-height:100%;background:#3e684f}
+.auth-right{background:var(--surface-soft);color:var(--text)}
+.auth-card{width:min(650px,100%);color:var(--text)}
+.auth-card-login,.auth-card-forgot,.auth-card-reset{width:min(410px,100%)}
+.auth-welcome h2{color:var(--text)}
+.auth-form-grid,.profile-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+.auth-grid-full{grid-column:1/-1}
+.social-auth-button{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:48px;margin:0 0 10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:16px;font-weight:600;cursor:pointer}
+.social-auth-button ion-icon{font-size:20px}
+.social-auth-button:disabled{opacity:.55;cursor:wait}
+.auth-divider{display:flex;align-items:center;justify-content:center;height:1px;margin:18px 0 23px;background:var(--border)}
+.auth-divider span{padding:0 10px;background:var(--surface-soft);color:var(--text-muted);font-size:14px}
+.auth-progress{margin:0 0 16px;color:var(--text-muted);font-size:14px}
+.password-input-wrap{position:relative}
+.password-input-wrap ion-input{padding-right:45px}
+.password-visibility{position:absolute;top:3px;right:4px;z-index:2;min-width:44px;min-height:44px;border:0;background:transparent;color:var(--teal-dark);font-size:13px;font-weight:650;cursor:pointer}
+.forgot-password-link{display:block;min-height:44px;margin:-12px 0 9px auto;border:0;background:transparent;color:var(--teal-dark);font-size:14px;font-weight:600;cursor:pointer}
+.auth-back{display:block;min-height:44px;margin:0 0 8px}
+.consent-field{display:flex;align-items:flex-start;gap:11px;margin:10px 0 17px;color:var(--text-muted);font-size:14px;line-height:1.5}
+.consent-field input{width:20px;height:20px;min-width:20px;margin:0;accent-color:var(--teal);cursor:pointer}
+.address-privacy-note{margin:0 0 18px;color:var(--text-muted);font-size:14px;line-height:1.5}
+.auth-progress~.auth-form-grid{margin-bottom:3px}
+.auth-switch{color:var(--text-muted)}
+.auth-switch .text-button,.text-button{color:var(--teal-dark)}
+.profile-completion-page{min-height:100dvh;padding:32px max(22px,7vw) 54px;background:var(--surface-soft);color:var(--text)}
+.profile-completion-card{width:min(680px,100%);margin:35px auto 0;padding:clamp(22px,4vw,40px);border:1px solid var(--border);border-radius:16px;background:var(--surface)}
+.profile-completion-card h1{margin:10px 0;color:var(--text);font-size:clamp(28px,4vw,38px)}
+.profile-completion-card>p,.settings-email,.settings-card>p{color:var(--text-muted);font-size:15px;line-height:1.6}
+.profile-form .field-label{color:var(--text)}
+.profile-form ion-input.form-input,.password-change-form ion-input.form-input{--background:var(--surface);--color:var(--text);border-color:var(--border)}
+.account-settings-grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:18px;align-items:start}
+.settings-card{padding:22px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.settings-card h2{margin:0;color:var(--text);font-size:20px}
+.settings-card h3{margin:24px 0 14px;color:var(--text);font-size:17px}
+.settings-email{margin:9px 0 20px}
+.connected-methods{display:grid;gap:8px;margin:18px 0}
+.connected-method{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:9px 12px;border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px}
+.connected-method>span{display:flex;align-items:center;gap:8px}
+.connected-method ion-icon{font-size:19px}
+.connected-method button:disabled{opacity:.55;cursor:wait}
+.connected-method strong{color:var(--text-muted);font-size:13px}
+.password-change-form{margin-top:20px;padding-top:18px;border-top:1px solid var(--border)}
+.settings-signout{margin-top:18px}
+.profile-form>.primary-button{margin-top:5px}
+@media(max-width:760px){
+  .auth-card{width:min(600px,100%)}
+  .auth-right{align-items:flex-start;padding:25px 20px 34px}
+  .auth-mini{padding-bottom:23px}
+  .auth-welcome h2{font-size:34px}
+  .mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .mobile-nav-item{gap:3px}
+  .mobile-nav-item>ion-icon{font-size:18px}
+  .mobile-nav-item>span{font-size:9px}
+  .account-settings-grid{grid-template-columns:minmax(0,1fr)}
+  .profile-completion-page{padding:23px 17px 35px}
+  .profile-completion-card{margin-top:22px;padding:22px 17px}
+}
+@media(max-width:420px){
+  .auth-form-grid,.profile-form-grid{grid-template-columns:minmax(0,1fr)}
+  .auth-grid-full{grid-column:auto}
+  .auth-right{padding-right:15px;padding-left:15px}
+  .auth-card{width:100%}
+}

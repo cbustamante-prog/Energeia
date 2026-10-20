@@ -14,10 +14,16 @@ from app.main import (
     BillingRecord,
     ConsumptionRecord,
     ElectricityRate,
+    OAuthIdentity,
+    OAuthState,
+    PasswordResetToken,
+    User,
     app,
     get_db,
+    settings,
     utc_today,
 )
+from urllib.parse import parse_qs, urlsplit
 
 
 @pytest.fixture()
@@ -48,9 +54,21 @@ def client():
 
 
 def create_account(client: TestClient, email: str, name: str = "Alex Test") -> str:
+    name_parts = name.split(" ", 1)
     response = client.post(
         "/api/auth/register",
-        json={"full_name": name, "email": email, "password": "correct horse battery"},
+        json={
+            "first_name": name_parts[0],
+            "last_name": name_parts[-1] if len(name_parts) > 1 else "User",
+            "email": email,
+            "password": "correct horse battery",
+            "password_confirmation": "correct horse battery",
+            "country": "Philippines",
+            "region": "Metro Manila",
+            "city": "Makati",
+            "street_address": "123 Test Street",
+            "terms_accepted": True,
+        },
     )
     assert response.status_code == 201, response.text
     return response.json()["access_token"]
@@ -71,6 +89,189 @@ def register_and_create_home(client: TestClient) -> tuple[dict, dict]:
     )
     assert rate_response.status_code == 200, rate_response.text
     return household, rate_response.json()
+
+
+def test_register_requires_confirmation_and_stores_complete_private_profile(client):
+    test_client, _ = client
+    registration = {
+        "first_name": "Alex",
+        "last_name": "Test",
+        "email": "profile@example.com",
+        "password": "correct horse battery",
+        "password_confirmation": "wrong password",
+        "country": "Philippines",
+        "region": "Metro Manila",
+        "city": "Makati",
+        "barangay": "Poblacion",
+        "street_address": "123 Test Street",
+        "postal_code": "1200",
+        "terms_accepted": True,
+    }
+    mismatch = test_client.post("/api/auth/register", json=registration)
+    assert mismatch.status_code == 422
+
+    registration["password_confirmation"] = registration["password"]
+    created = test_client.post("/api/auth/register", json=registration)
+    assert created.status_code == 201, created.text
+    account = created.json()["user"]
+    assert account["profile_complete"] is True
+    assert account["first_name"] == "Alex"
+    assert account["city"] == "Makati"
+    assert account["terms_accepted"] is True
+
+    test_client.headers["Authorization"] = f"Bearer {created.json()['access_token']}"
+    saved_profile = test_client.get("/api/auth/me").json()
+    assert saved_profile["street_address"] == "123 Test Street"
+    assert test_client.get("/api/auth/providers").json() == {
+        "providers": [],
+        "password_enabled": True,
+    }
+
+
+def test_password_reset_is_single_use_and_expires_existing_sessions(client, monkeypatch):
+    test_client, sessions = client
+    access_token = create_account(test_client, "reset@example.com")
+    sent_tokens = []
+    monkeypatch.setattr(settings, "smtp_host", "smtp.test.invalid")
+    monkeypatch.setattr(settings, "smtp_from_email", "no-reply@example.test")
+    monkeypatch.setattr(
+        "app.main.send_password_reset_email",
+        lambda email, token: sent_tokens.append((email, token)),
+    )
+
+    requested = test_client.post(
+        "/api/auth/password-reset/request", json={"email": "reset@example.com"}
+    )
+    assert requested.status_code == 202
+    assert requested.json()["message"].startswith("If the account exists")
+    assert sent_tokens[0][0] == "reset@example.com"
+
+    changed = test_client.post(
+        "/api/auth/password-reset/complete",
+        json={
+            "token": sent_tokens[0][1],
+            "password": "a brand new secure password",
+            "password_confirmation": "a brand new secure password",
+        },
+    )
+    assert changed.status_code == 200
+    test_client.headers["Authorization"] = f"Bearer {access_token}"
+    assert test_client.get("/api/auth/me").status_code == 401
+    assert test_client.post(
+        "/api/auth/password-reset/complete",
+        json={
+            "token": sent_tokens[0][1],
+            "password": "a second secure password",
+            "password_confirmation": "a second secure password",
+        },
+    ).status_code == 400
+    assert test_client.post(
+        "/api/auth/login",
+        json={"email": "reset@example.com", "password": "a brand new secure password"},
+    ).status_code == 200
+    with sessions() as db:
+        reset_record = db.query(PasswordResetToken).one()
+        assert reset_record.used_at is not None
+
+
+def test_oauth_uses_backend_callback_and_does_not_merge_by_email(client, monkeypatch):
+    test_client, sessions = client
+    monkeypatch.setattr(settings, "google_client_id", "google-client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "google-client-secret")
+    monkeypatch.setattr(settings, "api_public_url", "https://api.example.test")
+    create_account(test_client, "existing@example.com")
+
+    start = test_client.post("/api/auth/oauth/google/start")
+    assert start.status_code == 200, start.text
+    authorization_url = urlsplit(start.json()["authorization_url"])
+    params = parse_qs(authorization_url.query)
+    assert params["redirect_uri"] == [
+        "https://api.example.test/api/auth/oauth/google/callback"
+    ]
+
+    monkeypatch.setattr(
+        "app.main.fetch_oauth_identity",
+        lambda provider, code: (
+            "google-subject", "existing@example.com", "Alex Test", "Alex", "Test"
+        ),
+    )
+    callback = test_client.get(
+        "/api/auth/oauth/google/callback",
+        params={"code": "authorization-code", "state": params["state"][0]},
+        follow_redirects=False,
+    )
+    assert callback.status_code == 303
+    assert "oauth_error=account_exists" in callback.headers["location"]
+    with sessions() as db:
+        assert db.query(OAuthIdentity).count() == 0
+        assert db.query(OAuthState).one().consumed_at is not None
+
+
+def test_oauth_registration_profile_completion_and_secure_provider_linking(client, monkeypatch):
+    test_client, sessions = client
+    monkeypatch.setattr(settings, "google_client_id", "google-client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "google-client-secret")
+    monkeypatch.setattr(settings, "github_client_id", "github-client-id")
+    monkeypatch.setattr(settings, "github_client_secret", "github-client-secret")
+    monkeypatch.setattr(settings, "api_public_url", "https://api.example.test")
+    monkeypatch.setattr(settings, "frontend_url", "https://energeia.example.test")
+    monkeypatch.setattr(
+        "app.main.fetch_oauth_identity",
+        lambda provider, code: (
+            ("google-subject", "oauth@example.com", None, "Casey", "Example")
+            if provider == "google"
+            else ("github-subject", "different-provider-email@example.com", None, None, None)
+        ),
+    )
+
+    google_start = test_client.post("/api/auth/oauth/google/start").json()
+    google_state = parse_qs(urlsplit(google_start["authorization_url"]).query)["state"][0]
+    google_callback = test_client.get(
+        "/api/auth/oauth/google/callback",
+        params={"code": "google-code", "state": google_state},
+        follow_redirects=False,
+    )
+    assert google_callback.status_code == 303
+    oauth_fragment = parse_qs(urlsplit(google_callback.headers["location"]).fragment)
+    assert oauth_fragment["profile_complete"] == ["false"]
+    access_token = oauth_fragment["access_token"][0]
+    test_client.headers["Authorization"] = f"Bearer {access_token}"
+    profile = test_client.get("/api/auth/me").json()
+    assert profile["email"] == "oauth@example.com"
+    assert profile["profile_complete"] is False
+
+    profile_update = test_client.patch(
+        "/api/auth/profile",
+        json={
+            "first_name": "Casey",
+            "last_name": "Example",
+            "country": "Philippines",
+            "region": "Cebu",
+            "city": "Cebu City",
+            "street_address": "10 Example Road",
+            "terms_accepted": True,
+        },
+    )
+    assert profile_update.status_code == 200, profile_update.text
+    assert profile_update.json()["profile_complete"] is True
+
+    link_start = test_client.post("/api/auth/providers/github/start")
+    assert link_start.status_code == 200, link_start.text
+    link_state = parse_qs(urlsplit(link_start.json()["authorization_url"]).query)["state"][0]
+    linked = test_client.get(
+        "/api/auth/oauth/github/callback",
+        params={"code": "github-code", "state": link_state},
+        follow_redirects=False,
+    )
+    assert linked.status_code == 303
+    assert "access_token=" in linked.headers["location"]
+    assert test_client.get("/api/auth/providers").json() == {
+        "providers": ["github", "google"],
+        "password_enabled": False,
+    }
+    with sessions() as db:
+        assert db.query(User).filter(User.email == "oauth@example.com").count() == 1
+        assert db.query(OAuthIdentity).count() == 2
 
 
 def test_empty_or_inactive_household_usage_does_not_create_bill(client):

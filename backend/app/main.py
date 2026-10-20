@@ -5,15 +5,33 @@ from collections import defaultdict
 from collections.abc import Generator
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
+from email.message import EmailMessage
+import hashlib
+import json
+import secrets
+import smtplib
+import ssl
 from typing import Annotated
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
 
 import jwt
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import (
     Boolean,
@@ -25,10 +43,12 @@ from sqlalchemy import (
     Numeric,
     String,
     Time,
+    UniqueConstraint,
     create_engine,
     or_,
     select,
 )
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
 
 
@@ -37,6 +57,18 @@ class Settings(BaseSettings):
     jwt_secret: str = "development-only-change-before-deploying"
     jwt_expire_minutes: int = Field(default=1440, ge=1, le=10080)
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    frontend_url: str = "http://localhost:5173"
+    api_public_url: str = "http://localhost:8000"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    smtp_host: str = ""
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_use_ssl: bool = False
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
@@ -64,9 +96,63 @@ class User(Base):
     __tablename__ = "Users"
 
     user_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    full_name: Mapped[str] = mapped_column(String(150))
+    full_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     email: Mapped[str] = mapped_column(String(150), unique=True)
-    password_hash: Mapped[str] = mapped_column(String(255))
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    first_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    middle_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    country: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    region: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    barangay: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    street_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    unit_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    postal_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+
+class OAuthIdentity(Base):
+    __tablename__ = "OAuthIdentities"
+    __table_args__ = (
+        UniqueConstraint("provider", "subject", name="uq_oauth_provider_subject"),
+        Index("idx_oauth_identity_user", "user_id"),
+    )
+
+    identity_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("Users.user_id", ondelete="CASCADE"))
+    provider: Mapped[str] = mapped_column(String(20))
+    subject: Mapped[str] = mapped_column(String(255))
+    provider_email: Mapped[str] = mapped_column(String(150))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class OAuthState(Base):
+    __tablename__ = "OAuthStates"
+
+    state_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("Users.user_id", ondelete="CASCADE"), nullable=True
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "PasswordResetTokens"
+    __table_args__ = (Index("idx_password_reset_user", "user_id"),)
+
+    token_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("Users.user_id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 
@@ -234,7 +320,13 @@ def get_user(
     try:
         payload = jwt.decode(credentials.credentials, settings.jwt_secret, algorithms=["HS256"])
         user_id = payload.get("sub")
-        if not isinstance(user_id, str) or not user_id.isdigit():
+        auth_version = payload.get("ver", 0)
+        if (
+            not isinstance(user_id, str)
+            or not user_id.isdigit()
+            or not isinstance(auth_version, int)
+            or auth_version < 0
+        ):
             raise ValueError("Invalid account ID")
     except (InvalidTokenError, ValueError):
         raise HTTPException(
@@ -245,6 +337,12 @@ def get_user(
     user = db.get(User, int(user_id))
     if user is None:
         raise HTTPException(status_code=401, detail="Your account could not be verified.")
+    if payload.get("ver", 0) != user.auth_version:
+        raise HTTPException(
+            status_code=401,
+            detail="Your session has expired. Please sign in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 
@@ -255,27 +353,146 @@ class UserOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     user_id: int
-    full_name: str
+    full_name: str | None
     email: EmailStr
+    first_name: str | None
+    middle_name: str | None
+    last_name: str | None
+    country: str | None
+    region: str | None
+    city: str | None
+    barangay: str | None
+    street_address: str | None
+    unit_number: str | None
+    postal_code: str | None
+    phone_number: str | None
+    terms_accepted: bool
+    profile_complete: bool
+
+
+def profile_is_complete(user: User) -> bool:
+    return bool(
+        user.first_name
+        and user.last_name
+        and user.country
+        and user.region
+        and user.city
+        and user.street_address
+        and user.terms_accepted_at
+    )
+
+
+def serialize_user(user: User) -> dict:
+    return UserOutput(
+        user_id=user.user_id,
+        full_name=user.full_name,
+        email=user.email,
+        first_name=user.first_name,
+        middle_name=user.middle_name,
+        last_name=user.last_name,
+        country=user.country,
+        region=user.region,
+        city=user.city,
+        barangay=user.barangay,
+        street_address=user.street_address,
+        unit_number=user.unit_number,
+        postal_code=user.postal_code,
+        phone_number=user.phone_number,
+        terms_accepted=user.terms_accepted_at is not None,
+        profile_complete=profile_is_complete(user),
+    ).model_dump(mode="json")
 
 
 class AccountInput(BaseModel):
-    full_name: str = Field(min_length=1, max_length=150)
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    password_confirmation: str = Field(min_length=8, max_length=128)
+    country: str = Field(min_length=1, max_length=100)
+    region: str = Field(min_length=1, max_length=100)
+    city: str = Field(min_length=1, max_length=100)
+    barangay: str | None = Field(default=None, max_length=100)
+    street_address: str = Field(min_length=1, max_length=255)
+    unit_number: str | None = Field(default=None, max_length=100)
+    postal_code: str | None = Field(default=None, max_length=32)
+    phone_number: str | None = Field(default=None, max_length=32)
+    terms_accepted: bool
 
-    @field_validator("full_name")
+    @field_validator(
+        "first_name", "middle_name", "last_name", "country", "region", "city",
+        "barangay", "street_address", "unit_number", "postal_code", "phone_number",
+    )
     @classmethod
-    def clean_full_name(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("Your name is required.")
-        return value
+    def clean_profile_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @model_validator(mode="after")
+    def validate_registration(self):
+        if self.password != self.password_confirmation:
+            raise ValueError("Passwords do not match.")
+        if not all((self.first_name, self.last_name, self.country, self.region, self.city, self.street_address)):
+            raise ValueError("Complete the required name and home address fields.")
+        if not self.terms_accepted:
+            raise ValueError("Accept the Terms of Service and Privacy Policy to continue.")
+        return self
+
+
+class ProfileUpdate(BaseModel):
+    first_name: str = Field(min_length=1, max_length=100)
+    middle_name: str | None = Field(default=None, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    country: str = Field(min_length=1, max_length=100)
+    region: str = Field(min_length=1, max_length=100)
+    city: str = Field(min_length=1, max_length=100)
+    barangay: str | None = Field(default=None, max_length=100)
+    street_address: str = Field(min_length=1, max_length=255)
+    unit_number: str | None = Field(default=None, max_length=100)
+    postal_code: str | None = Field(default=None, max_length=32)
+    phone_number: str | None = Field(default=None, max_length=32)
+    terms_accepted: bool = False
+
+    @field_validator(
+        "first_name", "middle_name", "last_name", "country", "region", "city",
+        "barangay", "street_address", "unit_number", "postal_code", "phone_number",
+    )
+    @classmethod
+    def clean_profile_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
 
 
 class LoginInput(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetComplete(BaseModel):
+    token: str = Field(min_length=32, max_length=200)
+    password: str = Field(min_length=8, max_length=128)
+    password_confirmation: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_passwords(self):
+        if self.password != self.password_confirmation:
+            raise ValueError("Passwords do not match.")
+        return self
+
+
+class PasswordChangeInput(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=8, max_length=128)
+    password_confirmation: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_passwords(self):
+        if self.password != self.password_confirmation:
+            raise ValueError("Passwords do not match.")
+        return self
 
 
 class HouseholdInput(BaseModel):
@@ -428,10 +645,217 @@ class RecommendationUpdate(BaseModel):
 def issue_token(user: User) -> str:
     expires = datetime.now(UTC) + timedelta(minutes=settings.jwt_expire_minutes)
     return jwt.encode(
-        {"sub": str(user.user_id), "exp": expires},
+        {"sub": str(user.user_id), "ver": user.auth_version, "exp": expires},
         settings.jwt_secret,
         algorithm="HS256",
     )
+
+
+def oauth_credentials(provider: str) -> tuple[str, str]:
+    credentials = {
+        "google": (settings.google_client_id, settings.google_client_secret),
+        "github": (settings.github_client_id, settings.github_client_secret),
+    }.get(provider)
+    if credentials is None:
+        raise HTTPException(status_code=404, detail="That sign-in provider is not supported.")
+    if not all(credentials):
+        raise HTTPException(
+            status_code=503,
+            detail=f"{provider.title()} sign-in is not configured on the Energeia API.",
+        )
+    return credentials
+
+
+def start_oauth(provider: str, db: Session, user_id: int | None = None) -> dict[str, str]:
+    client_id, _ = oauth_credentials(provider)
+    state_id = secrets.token_urlsafe(32)
+    expires_at = utc_now() + timedelta(minutes=10)
+    db.add(
+        OAuthState(
+            state_id=state_id,
+            provider=provider,
+            user_id=user_id,
+            expires_at=expires_at,
+        )
+    )
+    db.commit()
+    state = jwt.encode(
+        {
+            "typ": "oauth_state",
+            "provider": provider,
+            "jti": state_id,
+            "exp": expires_at.replace(tzinfo=UTC),
+        },
+        settings.jwt_secret,
+        algorithm="HS256",
+    )
+    redirect_uri = (
+        f"{settings.api_public_url.rstrip('/')}/api/auth/oauth/{provider}/callback"
+    )
+    if provider == "google":
+        authorization_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": "openid email profile",
+                "state": state,
+            }
+        )
+    else:
+        authorization_url = "https://github.com/login/oauth/authorize?" + urlencode(
+            {
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "scope": "read:user user:email",
+                "state": state,
+            }
+        )
+    return {"authorization_url": authorization_url}
+
+
+def oauth_request_json(
+    url: str,
+    *,
+    data: bytes | None = None,
+    headers: dict[str, str] | None = None,
+) -> dict | list:
+    request = UrlRequest(
+        url,
+        data=data,
+        headers={"Accept": "application/json", **(headers or {})},
+        method="POST" if data is not None else "GET",
+    )
+    with urlopen(request, timeout=15) as response:
+        return json.loads(response.read())
+
+
+def fetch_oauth_identity(
+    provider: str, code: str
+) -> tuple[str, str, str | None, str | None, str | None]:
+    client_id, client_secret = oauth_credentials(provider)
+    redirect_uri = (
+        f"{settings.api_public_url.rstrip('/')}/api/auth/oauth/{provider}/callback"
+    )
+    if provider == "google":
+        token_result = oauth_request_json(
+            "https://oauth2.googleapis.com/token",
+            data=urlencode(
+                {
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                }
+            ).encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        if not isinstance(token_result, dict) or not token_result.get("access_token"):
+            raise ValueError("The provider did not issue an access token.")
+        profile = oauth_request_json(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {token_result['access_token']}"},
+        )
+        if not isinstance(profile, dict) or not profile.get("sub") or not profile.get("email"):
+            raise ValueError("The provider did not return a usable account.")
+        if profile.get("email_verified") is not True:
+            raise ValueError("Verify your Google email address before signing in.")
+        first_name = profile.get("given_name")
+        last_name = profile.get("family_name")
+        first_name = (
+            first_name.strip()[:100] if isinstance(first_name, str) and first_name.strip() else None
+        )
+        last_name = (
+            last_name.strip()[:100] if isinstance(last_name, str) and last_name.strip() else None
+        )
+        full_name = " ".join(part for part in (first_name, last_name) if part) or None
+        if full_name:
+            full_name = full_name[:150]
+        return str(profile["sub"]), str(profile["email"]).lower(), full_name, first_name, last_name
+
+    token_result = oauth_request_json(
+        "https://github.com/login/oauth/access_token",
+        data=urlencode(
+            {
+                "code": code,
+                "client_id": client_id,
+                "client_secret": client_secret,
+            }
+        ).encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    if not isinstance(token_result, dict) or not token_result.get("access_token"):
+        raise ValueError("The provider did not issue an access token.")
+    access_token = str(token_result["access_token"])
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    profile = oauth_request_json("https://api.github.com/user", headers=headers)
+    if not isinstance(profile, dict) or profile.get("id") is None:
+        raise ValueError("The provider did not return a usable account.")
+    emails = oauth_request_json("https://api.github.com/user/emails", headers=headers)
+    if not isinstance(emails, list):
+        raise ValueError("The provider did not return a verified email address.")
+    email_entry = next(
+        (
+            item for item in emails
+            if isinstance(item, dict) and item.get("primary") and item.get("verified")
+        ),
+        None,
+    )
+    if email_entry is None:
+        raise ValueError("Add and verify a primary email address with GitHub before signing in.")
+    full_name = profile.get("name")
+    if not isinstance(full_name, str):
+        full_name = None
+    return (
+        str(profile["id"]),
+        str(email_entry["email"]).lower(),
+        full_name[:150] if full_name else None,
+        None,
+        None,
+    )
+
+
+def oauth_redirect(*, token: str | None = None, profile_complete: bool = False, error: str | None = None):
+    fragment = {}
+    if token:
+        fragment["access_token"] = token
+        fragment["profile_complete"] = "true" if profile_complete else "false"
+    if error:
+        fragment["oauth_error"] = error
+    destination = f"{settings.frontend_url.rstrip('/')}/#{urlencode(fragment)}"
+    return RedirectResponse(destination, status_code=303)
+
+
+def send_password_reset_email(email: str, token: str) -> None:
+    if not all((settings.smtp_host, settings.smtp_from_email)):
+        raise RuntimeError("Password reset email is not configured.")
+    message = EmailMessage()
+    message["Subject"] = "Reset your Energeia password"
+    message["From"] = settings.smtp_from_email
+    message["To"] = email
+    message.set_content(
+        "A password reset was requested for your Energeia account.\n\n"
+        f"Use this link within 30 minutes: "
+        f"{settings.frontend_url.rstrip('/')}/#password_reset={token}\n\n"
+        "If you did not request this, you can ignore this email."
+    )
+    if settings.smtp_use_ssl:
+        with smtplib.SMTP_SSL(
+            settings.smtp_host, settings.smtp_port, timeout=15, context=ssl.create_default_context()
+        ) as server:
+            if settings.smtp_username:
+                server.login(settings.smtp_username, settings.smtp_password)
+            server.send_message(message)
+    else:
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
+            server.starttls(context=ssl.create_default_context())
+            if settings.smtp_username:
+                server.login(settings.smtp_username, settings.smtp_password)
+            server.send_message(message)
 
 
 def money(value: Decimal) -> Decimal:
@@ -820,9 +1244,23 @@ def register(body: AccountInput, db: Db) -> dict:
         db.add(rate)
         db.flush()
     user = User(
-        full_name=body.full_name,
+        full_name=" ".join(
+            part for part in (body.first_name, body.middle_name, body.last_name) if part
+        ),
         email=normalized_email,
         password_hash=password_hash.hash(body.password),
+        first_name=body.first_name,
+        middle_name=body.middle_name or None,
+        last_name=body.last_name,
+        country=body.country,
+        region=body.region,
+        city=body.city,
+        barangay=body.barangay or None,
+        street_address=body.street_address,
+        unit_number=body.unit_number or None,
+        postal_code=body.postal_code or None,
+        phone_number=body.phone_number or None,
+        terms_accepted_at=utc_now(),
     )
     db.add(user)
     db.flush()
@@ -831,27 +1269,251 @@ def register(body: AccountInput, db: Db) -> dict:
     return {
         "access_token": issue_token(user),
         "token_type": "bearer",
-        "user": UserOutput.model_validate(user).model_dump(mode="json"),
+        "user": serialize_user(user),
     }
 
 
 @router.post("/auth/login")
 def login(body: LoginInput, db: Db) -> dict:
     user = db.scalar(select(User).where(User.email == str(body.email).lower()))
-    if user is None or not password_hash.verify(body.password, user.password_hash):
+    if user is None or not user.password_hash or not password_hash.verify(
+        body.password, user.password_hash
+    ):
         raise HTTPException(
             status_code=401, detail="That email and password don't match. Please try again."
         )
     return {
         "access_token": issue_token(user),
         "token_type": "bearer",
-        "user": UserOutput.model_validate(user).model_dump(mode="json"),
+        "user": serialize_user(user),
     }
 
 
 @router.get("/auth/me", response_model=UserOutput)
 def current_account(user: CurrentUser) -> User:
-    return user
+    return serialize_user(user)
+
+
+@router.patch("/auth/profile", response_model=UserOutput)
+def update_profile(body: ProfileUpdate, db: Db, user: CurrentUser) -> dict:
+    values = body.model_dump(exclude={"terms_accepted"})
+    optional_fields = {
+        "middle_name", "barangay", "unit_number", "postal_code", "phone_number"
+    }
+    for field, value in values.items():
+        if field in optional_fields and not value:
+            value = None
+        setattr(user, field, value)
+    user.full_name = " ".join(
+        part for part in (user.first_name, user.middle_name, user.last_name) if part
+    ) or None
+    if body.terms_accepted:
+        user.terms_accepted_at = user.terms_accepted_at or utc_now()
+    if not profile_is_complete(user):
+        raise HTTPException(
+            status_code=422,
+            detail="Add your name, home location, street address, and accept the policies to continue.",
+        )
+    db.commit()
+    db.refresh(user)
+    return serialize_user(user)
+
+
+@router.get("/auth/providers")
+def connected_providers(db: Db, user: CurrentUser) -> dict[str, object]:
+    providers = db.scalars(
+        select(OAuthIdentity.provider).where(OAuthIdentity.user_id == user.user_id)
+    )
+    return {
+        "providers": sorted(set(providers)),
+        "password_enabled": bool(user.password_hash),
+    }
+
+
+@router.post("/auth/oauth/{provider}/start")
+def oauth_start(provider: str, db: Db) -> dict[str, str]:
+    return start_oauth(provider, db)
+
+
+@router.post("/auth/providers/{provider}/start")
+def oauth_link_start(provider: str, db: Db, user: CurrentUser) -> dict[str, str]:
+    return start_oauth(provider, db, user.user_id)
+
+
+@router.get("/auth/oauth/{provider}/callback", name="oauth_callback")
+def oauth_callback(
+    provider: str,
+    db: Db,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+):
+    if provider not in {"google", "github"}:
+        return oauth_redirect(error="unsupported_provider")
+    if error:
+        return oauth_redirect(error="sign_in_cancelled")
+    if not code or not state:
+        return oauth_redirect(error="invalid_callback")
+    try:
+        claims = jwt.decode(state, settings.jwt_secret, algorithms=["HS256"])
+        if claims.get("typ") != "oauth_state" or claims.get("provider") != provider:
+            raise InvalidTokenError("Invalid OAuth state")
+    except InvalidTokenError:
+        return oauth_redirect(error="invalid_state")
+    state_record = db.get(OAuthState, claims.get("jti"))
+    if (
+        state_record is None
+        or state_record.provider != provider
+        or state_record.consumed_at is not None
+        or state_record.expires_at <= utc_now()
+    ):
+        return oauth_redirect(error="expired_state")
+    state_record.consumed_at = utc_now()
+    db.commit()
+
+    try:
+        subject, email, full_name, first_name, last_name = fetch_oauth_identity(provider, code)
+        email = str(TypeAdapter(EmailStr).validate_python(email)).lower()
+        if len(email) > 150 or not subject or len(subject) > 255:
+            raise ValueError("The provider account details are not valid.")
+    except (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return oauth_redirect(error="provider_failure")
+
+    identity = db.scalar(
+        select(OAuthIdentity).where(
+            OAuthIdentity.provider == provider,
+            OAuthIdentity.subject == subject,
+        )
+    )
+    if state_record.user_id is not None:
+        user = db.get(User, state_record.user_id)
+        if user is None:
+            return oauth_redirect(error="account_unavailable")
+        if identity and identity.user_id != user.user_id:
+            return oauth_redirect(error="provider_already_linked")
+        if identity is None:
+            db.add(
+                OAuthIdentity(
+                    user_id=user.user_id,
+                    provider=provider,
+                    subject=subject,
+                    provider_email=email,
+                )
+            )
+    elif identity is not None:
+        user = db.get(User, identity.user_id)
+        if user is None:
+            return oauth_redirect(error="account_unavailable")
+    else:
+        if db.scalar(select(User).where(User.email == email)):
+            return oauth_redirect(error="account_exists")
+        user = User(
+            email=email,
+            full_name=full_name,
+            first_name=first_name,
+            last_name=last_name,
+            password_hash=None,
+        )
+        db.add(user)
+        db.flush()
+        db.add(
+            OAuthIdentity(
+                user_id=user.user_id,
+                provider=provider,
+                subject=subject,
+                provider_email=email,
+            )
+        )
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return oauth_redirect(error="account_conflict")
+    db.refresh(user)
+    return oauth_redirect(
+        token=issue_token(user),
+        profile_complete=profile_is_complete(user),
+    )
+
+
+@router.post("/auth/password-reset/request", status_code=status.HTTP_202_ACCEPTED)
+def request_password_reset(body: PasswordResetRequest, db: Db) -> dict[str, str]:
+    if not all((settings.smtp_host, settings.smtp_from_email)):
+        raise HTTPException(
+            status_code=503,
+            detail="Password reset email is not configured on the Energeia API.",
+        )
+    email = str(body.email).lower()
+    user = db.scalar(select(User).where(User.email == email))
+    if user is None:
+        return {"message": "If the account exists, password reset instructions will be sent."}
+    recent = db.scalar(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.user_id,
+            PasswordResetToken.created_at >= utc_now() - timedelta(minutes=15),
+        )
+    )
+    if recent:
+        return {"message": "If the account exists, password reset instructions will be sent."}
+
+    raw_token = secrets.token_urlsafe(32)
+    db.add(
+        PasswordResetToken(
+            user_id=user.user_id,
+            token_hash=hashlib.sha256(raw_token.encode()).hexdigest(),
+            expires_at=utc_now() + timedelta(minutes=30),
+        )
+    )
+    try:
+        send_password_reset_email(user.email, raw_token)
+        db.commit()
+    except (smtplib.SMTPException, OSError, RuntimeError):
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="We could not send the reset email. Try again later.",
+        ) from None
+    return {"message": "If the account exists, password reset instructions will be sent."}
+
+
+@router.post("/auth/password-reset/complete")
+def complete_password_reset(body: PasswordResetComplete, db: Db) -> dict[str, str]:
+    token_hash = hashlib.sha256(body.token.encode()).hexdigest()
+    reset_token = db.scalar(
+        select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash)
+        .with_for_update()
+    )
+    if (
+        reset_token is None
+        or reset_token.used_at is not None
+        or reset_token.expires_at <= utc_now()
+    ):
+        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+    user = db.get(User, reset_token.user_id)
+    if user is None:
+        raise HTTPException(status_code=400, detail="This reset link is invalid or has expired.")
+    user.password_hash = password_hash.hash(body.password)
+    user.auth_version += 1
+    for active_token in db.scalars(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.user_id,
+            PasswordResetToken.used_at.is_(None),
+        )
+    ):
+        active_token.used_at = utc_now()
+    db.commit()
+    return {"message": "Your password has been updated. Sign in with your new password."}
+
+
+@router.post("/auth/password/change")
+def change_password(body: PasswordChangeInput, db: Db, user: CurrentUser) -> dict[str, str]:
+    if not user.password_hash or not password_hash.verify(body.current_password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Your current password is incorrect.")
+    user.password_hash = password_hash.hash(body.password)
+    user.auth_version += 1
+    db.commit()
+    return {"message": "Your password has been updated."}
 
 
 @router.get("/rates")
