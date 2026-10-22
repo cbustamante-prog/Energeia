@@ -26,14 +26,21 @@ export async function request(path, options = {}) {
     const validationMessages = Array.isArray(detail)
       ? detail.map((issue) => issue?.msg).filter((message) => typeof message === 'string')
       : [];
-    throw new Error(
+    const error = new Error(
       typeof detail === 'string'
         ? detail
         : validationMessages.length
           ? validationMessages.join(' ')
           : 'The server could not complete your request.',
     );
+    error.status = response.status;
+    if (response.status === 401 && detail !== 'Your current password is incorrect.' && token === localStorage.getItem('energeia_token') && token && !path.startsWith('/auth/login')) {
+      localStorage.removeItem('energeia_token');
+      window.dispatchEvent(new Event('energeia:session-expired'));
+    }
+    throw error;
   }
+  if (data === null) throw new Error('The API returned an invalid response. Please try again.');
   return data;
 }
 

@@ -98,3 +98,28 @@ uv run pytest
 ```
 
 The FastAPI test suite uses an isolated in-memory SQLite database; it does **not** need your Supabase project or modify its records. The live `/api/health` endpoint separately verifies the configured PostgreSQL connection.
+
+## Website routes and browser checks
+
+Public routes are `/`, `/login`, `/register`, `/forgot-password`, and `/reset-password`.
+Protected views are `/overview`, `/appliances`, `/history`, `/insights`, `/scenarios`,
+and `/settings`. They redirect to sign-in when no session is available. The Vercel
+project root should be `frontend`; `frontend/vercel.json` provides the SPA fallback.
+
+Browser QA uses synthetic accounts and the real API against a disposable SQLite
+store. It does not verify PostgreSQL deployment or real OAuth/SMTP credentials.
+
+1. From `backend`, run `uv run python scripts/browser_server.py` (port 8000).
+   This helper ignores database and provider credentials and removes its database
+   on exit. Do not use it as a production server.
+2. From `frontend`, run `npm run dev -- --host 0.0.0.0` with the default local API URL.
+3. Register/open the local Preview browser, then run `npm run test.browser` from
+   `frontend`. It attaches to the shared browser through `coderabbit-agent-browser`.
+   Outside this environment, set `ENERGEIA_BROWSER_CDP` to an existing Chromium CDP
+   endpoint. The tests navigate the browser and create disposable local data.
+
+The suite exercises all eight requested viewport sizes in both themes, real local
+registration and CRUD, planner calculations, navigation, overlays and scrolling.
+Run `npm run test.unit`, `npm run lint`, `npm run build`, and backend `uv run pytest`
+for the other checks. Real touchpad hardware, mobile keyboards and production OAuth
+still need device/provider checks after deployment.

@@ -1,7 +1,12 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.jsx';
+
+beforeEach(() => {
+  window.history.replaceState(null, '', '/login');
+  vi.stubGlobal('scrollTo', vi.fn());
+});
 
 afterEach(() => {
   cleanup();
@@ -11,7 +16,24 @@ afterEach(() => {
 });
 
 describe('Energeia', () => {
-  it('welcomes new visitors with the sign-in form', async () => {
+  it('introduces real features and links to registration from the landing page', async () => {
+    window.history.replaceState(null, '', '/');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: /Small habits/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Get started' }).getAttribute('href')).toBe('/register');
+    expect(screen.getByRole('link', { name: 'Sign in', exact: true }).getAttribute('href')).toBe('/login');
+  });
+
+  it('preserves the intended private route when redirecting to sign-in', async () => {
+    window.history.replaceState(null, '', '/scenarios');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Welcome back' });
+    expect(window.location.pathname).toBe('/login');
+    expect(new URLSearchParams(window.location.search).get('next')).toBe('/scenarios');
+  });
+
+
+  it('loads the real sign-in route', async () => {
     const { container } = render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeTruthy();
@@ -124,5 +146,7 @@ describe('Energeia', () => {
       await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe(heading));
       expect(document.documentElement.dataset.theme).toBe('dark');
     }
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/auth/me'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/calculate'))).toHaveLength(1);
   });
 });

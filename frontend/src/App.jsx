@@ -1,17 +1,13 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  IonApp, IonButton, IonContent, IonIcon, IonInput, IonModal, IonPage, IonSelect,
+  IonApp, IonButton, IonIcon, IonInput, IonModal, IonSelect,
   IonSelectOption, IonSpinner, IonToast, setupIonicReact,
 } from '@ionic/react';
 import {
-  addOutline, arrowDownOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
-  checkmarkCircleOutline, checkmarkOutline, chevronDownOutline, chevronForwardOutline,
-  closeOutline, createOutline, ellipsisHorizontal, flashOutline, gridOutline,
-  helpCircleOutline, homeOutline, leafOutline, logOutOutline, logoGithub, logoGoogle,
-  menuOutline, moonOutline, notificationsOutline, playOutline, pulseOutline,
-  searchOutline, settingsOutline, shareSocialOutline, sparklesOutline, sunnyOutline,
-  timeOutline, trashOutline, trendingDownOutline, warningOutline, waterOutline,
+  addOutline, arrowUpOutline, bulbOutline, calendarClearOutline, checkmarkCircleOutline, chevronDownOutline, chevronForwardOutline, closeOutline, createOutline, flashOutline, gridOutline, homeOutline, logOutOutline, logoGithub, logoGoogle, menuOutline, moonOutline, playOutline, pulseOutline, searchOutline, settingsOutline, sparklesOutline, sunnyOutline, timeOutline, trashOutline, trendingDownOutline, waterOutline
 } from 'ionicons/icons';
+import { BrowserRouter, Link, useLocation, useNavigate } from 'react-router-dom';
+import LandingPage from './LandingPage.jsx';
 import { fmtKwh, fmtMoney, request } from './api.js';
 
 setupIonicReact();
@@ -38,256 +34,19 @@ function Logo({ small = false }) {
   );
 }
 
-function SemiCircleGauge({ value = 2.4, max = 5.0, unit = 'kWh' }) {
-  const numericVal = parseFloat(value) || 2.4;
-  const percentage = Math.min(Math.max(numericVal / max, 0), 1);
-  const radius = 68;
-  const circumference = Math.PI * radius; // ~213.63
-  const strokeDashoffset = circumference * (1 - percentage);
-
-  return (
-    <div className="gauge-widget">
-      <div className="gauge-svg-wrap">
-        <svg viewBox="0 0 176 96" className="gauge-svg">
-          <defs>
-            <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#0066FF" />
-              <stop offset="60%" stopColor="#00A3FF" />
-              <stop offset="100%" stopColor="#10B981" />
-            </linearGradient>
-            <filter id="gaugeGlow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
-              <feMerge>
-                <feMergeNode in="coloredBlur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <path
-            d="M 20 86 A 68 68 0 0 1 156 86"
-            fill="none"
-            className="gauge-track"
-            strokeWidth="12"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 20 86 A 68 68 0 0 1 156 86"
-            fill="none"
-            stroke="url(#gaugeGradient)"
-            className="gauge-fill"
-            strokeWidth="12"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            filter="url(#gaugeGlow)"
-          />
-        </svg>
-        <div className="gauge-center-badge">
-          <IonIcon icon={flashOutline} className="gauge-bolt-icon" />
-          <div className="gauge-center-val">
-            <strong>{numericVal}</strong>
-            <small>{unit}</small>
-          </div>
-        </div>
-      </div>
-      <div className="gauge-scale-labels">
-        <span>0 {unit}</span>
-        <span className="gauge-now-tag">Now</span>
-        <span>{max} {unit}</span>
-      </div>
-    </div>
-  );
-}
-
-function SavingsDonut({ percentage = 67, label = 'GOAL REACHED' }) {
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius; // ~326.73
-  const strokeDashoffset = circumference * (1 - percentage / 100);
-
-  return (
-    <div className="savings-donut-container">
-      <div className="savings-donut-svg-wrap">
-        <svg viewBox="0 0 136 136" className="savings-donut-svg">
-          <defs>
-            <linearGradient id="donutProgressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#10B981" />
-              <stop offset="100%" stopColor="#0F4A38" />
-            </linearGradient>
-          </defs>
-          <circle
-            cx="68"
-            cy="68"
-            r={radius}
-            fill="none"
-            className="donut-track"
-            strokeWidth="13"
-          />
-          <circle
-            cx="68"
-            cy="68"
-            r={radius}
-            fill="none"
-            stroke="url(#donutProgressGradient)"
-            className="donut-fill"
-            strokeWidth="13"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            transform="rotate(-90 68 68)"
-          />
-        </svg>
-        <div className="donut-center-content">
-          <strong className="donut-center-pct">{percentage}%</strong>
-          <span className="donut-center-label">{label}</span>
-        </div>
-      </div>
-      <div className="savings-breakdown-list">
-        <div className="savings-item">
-          <div className="savings-item-label">
-            <span className="savings-dot dot-eco" />
-            <span>Eco Generated</span>
-          </div>
-          <strong>$124.50</strong>
-        </div>
-        <div className="savings-item">
-          <div className="savings-item-label">
-            <span className="savings-dot dot-grid" />
-            <span>Grid Savings</span>
-          </div>
-          <strong>$42.10</strong>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CategoryDonut({ centerValue = '2.4kWh' }) {
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius; // ~314.16
-  const slices = [
-    { label: 'AC', pct: 40, color: '#F59E0B' },
-    { label: 'Fridge', pct: 20, color: '#EC4899' },
-    { label: 'Water Heater', pct: 15, color: '#0066FF' },
-    { label: 'Lights', pct: 10, color: '#10B981' },
-    { label: 'Other', pct: 15, color: '#64748B' },
-  ];
-
-  let cumulativeOffset = 0;
-
-  return (
-    <div className="category-donut-container">
-      <div className="category-donut-svg-wrap">
-        <svg viewBox="0 0 130 130" className="category-donut-svg">
-          {slices.map((slice) => {
-            const dashLength = (slice.pct / 100) * circumference;
-            const offset = -(cumulativeOffset / 100) * circumference;
-            cumulativeOffset += slice.pct;
-            return (
-              <circle
-                key={slice.label}
-                cx="65"
-                cy="65"
-                r={radius}
-                fill="none"
-                stroke={slice.color}
-                strokeWidth="14"
-                strokeDasharray={`${dashLength} ${circumference - dashLength}`}
-                strokeDashoffset={offset}
-                transform="rotate(-90 65 65)"
-                className="category-slice"
-              />
-            );
-          })}
-        </svg>
-        <div className="category-donut-center">
-          <strong>{centerValue}</strong>
-        </div>
-      </div>
-      <div className="category-legend-grid">
-        {slices.map((slice) => (
-          <div key={slice.label} className="category-legend-item">
-            <span className="legend-color-dot" style={{ backgroundColor: slice.color }} />
-            <span className="legend-label">{slice.label}</span>
-            <strong className="legend-pct">{slice.pct}%</strong>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function InteractiveBarChart({ bars, maxBar, timeFilter, onTimeFilterChange }) {
-  const [hoveredDay, setHoveredDay] = useState(null);
-
-  const defaultWeekly = [
-    { day: 'MON', kwh: 1.8, height: '42%' },
-    { day: 'TUE', kwh: 3.2, height: '92%', peak: true, tooltip: '3.2 kW' },
-    { day: 'WED', kwh: 2.1, height: '52%' },
-    { day: 'THU', kwh: 3.0, height: '86%' },
-    { day: 'FRI', kwh: 2.2, height: '55%' },
-    { day: 'SAT', kwh: 1.6, height: '38%' },
-    { day: 'SUN', kwh: 2.7, height: '74%' },
-  ];
-
-  const chartData = bars && bars.length > 0 && bars.some((b) => Number(b.kwh) > 0)
-    ? bars.map((b, i) => ({
-        day: b.day.toUpperCase(),
-        kwh: Number(b.kwh),
-        height: `${Math.max(14, Math.round((Number(b.kwh) / (maxBar || 1)) * 92))}%`,
-        peak: b.highlight || i === 1,
-        tooltip: `${fmtKwh(b.kwh)} kW`,
-      }))
-    : defaultWeekly;
-
-  return (
-    <div className="chart-card realtime-usage-panel">
-      <div className="usage-panel-top">
-        <div>
-          <h3>Real-time Usage</h3>
-          <p>Power consumption by hour (kW)</p>
-        </div>
-        <div className="time-select-pill">
-          <select
-            value={timeFilter}
-            onChange={(e) => onTimeFilterChange(e.target.value)}
-            aria-label="Filter usage time range"
-          >
-            <option value="24h">Last 24 Hours</option>
-            <option value="today">Today</option>
-            <option value="week">This Week</option>
-            <option value="month">This Month</option>
-          </select>
-          <IonIcon icon={chevronDownOutline} />
-        </div>
-      </div>
-      <div className="usage-chart-canvas">
-        <div className="usage-bars-row">
-          {chartData.map((item) => {
-            const isHovered = hoveredDay === item.day;
-            const isPeak = item.peak;
-            return (
-              <div
-                key={item.day}
-                className={`usage-bar-col${isPeak ? ' is-peak' : ''}${isHovered ? ' is-hovered' : ''}`}
-                onMouseEnter={() => setHoveredDay(item.day)}
-                onMouseLeave={() => setHoveredDay(null)}
-              >
-                {(isPeak || isHovered) && (
-                  <div className={`bar-tooltip-pill${isHovered ? ' tooltip-active' : ''}`}>
-                    {item.tooltip || `${item.kwh} kW`}
-                  </div>
-                )}
-                <div className="bar-track-channel">
-                  <div className="bar-fill-pillar" style={{ height: item.height }} />
-                </div>
-                <span className="bar-day-name">{item.day}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
+function UsageChart({ bars }) {
+  const max = Math.max(1, ...bars.map((bar) => Number(bar.kwh)));
+  return <article className="chart-card usage-estimates">
+    <h2>A week in your home</h2>
+    <p>Estimated daily energy from active schedules · kWh</p>
+    {bars.some((bar) => Number(bar.kwh) > 0) ? <div className="estimate-bars" role="list" aria-label="Estimated usage by weekday">
+      {bars.map((bar) => <div key={bar.day} role="listitem" className="estimate-day">
+        <span>{fmtKwh(bar.kwh)}</span>
+        <div className="estimate-track"><div style={{ height: `${Number(bar.kwh) / max * 100}%` }} /></div>
+        <strong>{bar.day}</strong>
+      </div>)}
+    </div> : <p className="empty-inline">Add an active appliance schedule to see your weekly estimate.</p>}
+  </article>;
 }
 
 function ThemeToggle({ darkMode, onToggle }) {
@@ -300,13 +59,15 @@ function ThemeToggle({ darkMode, onToggle }) {
       aria-pressed={darkMode}
       onClick={onToggle}
     >
-      <IonIcon icon={darkMode ? sunnyOutline : moonOutline} />
+      <IonIcon aria-hidden="true" icon={darkMode ? sunnyOutline : moonOutline} />
     </button>
   );
 }
 
-function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }) {
-  const [view, setView] = useState(resetToken ? 'reset' : 'login');
+function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken, authMessage }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const view = pathname === '/reset-password' ? 'reset' : pathname === '/register' ? 'register' : pathname === '/forgot-password' ? 'forgot' : 'login';
   const [registrationStep, setRegistrationStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -369,7 +130,7 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }
           },
         });
         setSuccess(result.message);
-        setView('login');
+        navigate('/login', { replace: true });
       } else {
         const result = await request(`/auth/${registering ? 'register' : 'login'}`, {
           method: 'POST',
@@ -396,7 +157,7 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }
   }[view];
 
   function changeView(nextView) {
-    setView(nextView);
+    navigate(nextView === 'register' ? '/register' : nextView === 'forgot' ? '/forgot-password' : '/login');
     setRegistrationStep(1);
     setError('');
     setSuccess('');
@@ -405,58 +166,61 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }
   return (
     <main className="auth-page">
       <div className="auth-left">
-        <Logo />
+        <Link to="/" aria-label="Energeia home"><Logo /></Link>
+        <div className="auth-pitch"><span className="eyebrow">A little clarity. A better energy habit.</span><h1>Know your home.<br />Understand your energy.</h1><p>Turn appliance schedules into useful estimates, and explore changes at your own pace.</p></div>
       </div>
       <div className="auth-right">
         <form className={`auth-card auth-card-${view}`} onSubmit={submit}>
-          <div className="auth-mini"><Logo small /><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} /></div>
-          <div className="auth-welcome"><h2>{title}</h2></div>
+          <div className="auth-mini"><Link to="/" aria-label="Energeia home"><Logo small /></Link><ThemeToggle darkMode={darkMode} onToggle={onToggleTheme} /></div>
+          <div className="auth-welcome"><h1>{title}</h1></div>
           {!['forgot', 'reset'].includes(view) && <>
             <button className="social-auth-button" type="button" onClick={() => beginOAuth('google')} disabled={loading}>
-              <IonIcon icon={logoGoogle} /> Continue with Google
+              <IonIcon aria-hidden="true" icon={logoGoogle} /> Continue with Google
             </button>
             <button className="social-auth-button" type="button" onClick={() => beginOAuth('github')} disabled={loading}>
-              <IonIcon icon={logoGithub} /> Continue with GitHub
+              <IonIcon aria-hidden="true" icon={logoGithub} /> Continue with GitHub
             </button>
             <div className="auth-divider"><span>or</span></div>
           </>}
           {registering && registrationStep === 2 && <div className="auth-progress" aria-label="Registration step 2 of 2">Step 2 of 2 · Home address</div>}
           {registering && registrationStep === 1 && <div className="auth-form-grid">
-            <label className="field-label">First name<IonInput className="form-input" name="first_name" autocomplete="given-name" value={credentials.first_name} onIonInput={updateCredential} required maxlength={100} /></label>
-            <label className="field-label">Last name<IonInput className="form-input" name="last_name" autocomplete="family-name" value={credentials.last_name} onIonInput={updateCredential} required maxlength={100} /></label>
-            <label className="field-label">Middle name <span className="field-hint">Optional</span><IonInput className="form-input" name="middle_name" autocomplete="additional-name" value={credentials.middle_name} onIonInput={updateCredential} maxlength={100} /></label>
-            <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
-            <label className="field-label">Password<div className="password-input-wrap"><IonInput className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password} onIonInput={updateCredential} required minlength={8} maxlength={128} /><button className="password-visibility" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
-            <label className="field-label">Confirm password<IonInput className="form-input" name="password_confirmation" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password_confirmation} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
+            <label className="field-label">First name<IonInput aria-label="First name" className="form-input" name="first_name" autocomplete="given-name" value={credentials.first_name} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Last name<IonInput aria-label="Last name" className="form-input" name="last_name" autocomplete="family-name" value={credentials.last_name} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Middle name <span className="field-hint">Optional</span><IonInput aria-label="Middle name" className="form-input" name="middle_name" autocomplete="additional-name" value={credentials.middle_name} onIonInput={updateCredential} maxlength={100} /></label>
+            <label className="field-label">Email address<IonInput aria-label="Email" className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
+            <label className="field-label">Password<div className="password-input-wrap"><IonInput aria-label="Password" className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password} onIonInput={updateCredential} required minlength={8} maxlength={128} /><button className="password-visibility" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
+            <label className="field-label">Confirm password<IonInput aria-label="Password confirmation" className="form-input" name="password_confirmation" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password_confirmation} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
           </div>}
           {registering && registrationStep === 2 && <div className="auth-form-grid">
-            <label className="field-label">Country<IonInput className="form-input" name="country" autocomplete="country-name" value={credentials.country} onIonInput={updateCredential} required maxlength={100} /></label>
-            <label className="field-label">Province / State / Region<IonInput className="form-input" name="region" autocomplete="address-level1" value={credentials.region} onIonInput={updateCredential} required maxlength={100} /></label>
-            <label className="field-label">City / Municipality<IonInput className="form-input" name="city" autocomplete="address-level2" value={credentials.city} onIonInput={updateCredential} required maxlength={100} /></label>
-            <label className="field-label">Barangay <span className="field-hint">Optional</span><IonInput className="form-input" name="barangay" value={credentials.barangay} onIonInput={updateCredential} maxlength={100} /></label>
-            <label className="field-label auth-grid-full">Street address<IonInput className="form-input" name="street_address" autocomplete="street-address" value={credentials.street_address} onIonInput={updateCredential} required maxlength={255} /></label>
-            <label className="field-label">House / Unit <span className="field-hint">Optional</span><IonInput className="form-input" name="unit_number" value={credentials.unit_number} onIonInput={updateCredential} maxlength={100} /></label>
-            <label className="field-label">Postal code <span className="field-hint">Optional</span><IonInput className="form-input" name="postal_code" autocomplete="postal-code" value={credentials.postal_code} onIonInput={updateCredential} maxlength={32} /></label>
-            <label className="field-label">Phone number <span className="field-hint">Optional</span><IonInput className="form-input" name="phone_number" type="tel" autocomplete="tel" value={credentials.phone_number} onIonInput={updateCredential} maxlength={32} /></label>
+            <label className="field-label">Country<IonInput aria-label="Country" className="form-input" name="country" autocomplete="country-name" value={credentials.country} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Province / State / Region<IonInput aria-label="Region" className="form-input" name="region" autocomplete="address-level1" value={credentials.region} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">City / Municipality<IonInput aria-label="City" className="form-input" name="city" autocomplete="address-level2" value={credentials.city} onIonInput={updateCredential} required maxlength={100} /></label>
+            <label className="field-label">Barangay <span className="field-hint">Optional</span><IonInput aria-label="Barangay" className="form-input" name="barangay" value={credentials.barangay} onIonInput={updateCredential} maxlength={100} /></label>
+            <label className="field-label auth-grid-full">Street address<IonInput aria-label="Street address" className="form-input" name="street_address" autocomplete="street-address" value={credentials.street_address} onIonInput={updateCredential} required maxlength={255} /></label>
+            <label className="field-label">House / Unit <span className="field-hint">Optional</span><IonInput aria-label="Unit number" className="form-input" name="unit_number" value={credentials.unit_number} onIonInput={updateCredential} maxlength={100} /></label>
+            <label className="field-label">Postal code <span className="field-hint">Optional</span><IonInput aria-label="Postal code" className="form-input" name="postal_code" autocomplete="postal-code" value={credentials.postal_code} onIonInput={updateCredential} maxlength={32} /></label>
+            <label className="field-label">Phone number <span className="field-hint">Optional</span><IonInput aria-label="Phone number" className="form-input" name="phone_number" type="tel" autocomplete="tel" value={credentials.phone_number} onIonInput={updateCredential} maxlength={32} /></label>
             <label className="consent-field auth-grid-full"><input type="checkbox" name="terms_accepted" checked={credentials.terms_accepted} onChange={(event) => setCredentials((previous) => ({ ...previous, terms_accepted: event.target.checked }))} required /><span>I agree to the Terms of Service and Privacy Policy.</span></label>
             <p className="address-privacy-note auth-grid-full">Your home location helps personalize household energy settings. Your full address is private and is not shown on the dashboard.</p>
           </div>}
           {view === 'login' && <>
-            <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
-            <label className="field-label">Password<div className="password-input-wrap"><IonInput className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="current-password" value={credentials.password} onIonInput={updateCredential} required maxlength={128} /><button className="password-visibility" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
+            <label className="field-label">Email address<IonInput aria-label="Email" className="form-input" name="email" type="email" placeholder="you@example.com" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>
+            <label className="field-label">Password<div className="password-input-wrap"><IonInput aria-label="Password" className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="current-password" value={credentials.password} onIonInput={updateCredential} required maxlength={128} /><button className="password-visibility" type="button" aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword(!showPassword)}>{showPassword ? 'Hide' : 'Show'}</button></div></label>
             <button className="forgot-password-link" type="button" onClick={() => changeView('forgot')}>Forgot password?</button>
           </>}
-          {view === 'forgot' && <label className="field-label">Email address<IonInput className="form-input" name="email" type="email" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>}
+          {view === 'forgot' && <label className="field-label">Email address<IonInput aria-label="Email" className="form-input" name="email" type="email" autocomplete="email" value={credentials.email} onIonInput={updateCredential} required maxlength={150} /></label>}
           {view === 'reset' && <>
-            <label className="field-label">New password<IonInput className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
-            <label className="field-label">Confirm new password<IonInput className="form-input" name="password_confirmation" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password_confirmation} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
+            {!resetToken && <p role="alert" className="inline-error">This reset link is missing or expired. Request a new password reset email.</p>}
+            <label className="field-label">New password<IonInput aria-label="Password" className="form-input" name="password" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
+            <label className="field-label">Confirm new password<IonInput aria-label="Password confirmation" className="form-input" name="password_confirmation" type={showPassword ? 'text' : 'password'} autocomplete="new-password" value={credentials.password_confirmation} onIonInput={updateCredential} required minlength={8} maxlength={128} /></label>
           </>}
-          {oauthError && <div className="inline-error">{oauthError}</div>}
+          {authMessage && <p className="form-note" role="status">{authMessage}</p>}
+          {oauthError && <div className="inline-error" role="alert">{oauthError}</div>}
           {error && <div className="inline-error" role="alert">{error}</div>}
           {success && <div className="form-note" role="status">{success}</div>}
           {registering && registrationStep === 2 && <button className="text-button auth-back" type="button" onClick={() => setRegistrationStep(1)}>Back to personal information</button>}
-          <IonButton type="submit" expand="block" className="primary-button auth-submit" disabled={loading}>
-            {loading ? <IonSpinner name="crescent" /> : <>{registering ? (registrationStep === 1 ? 'Continue' : 'Create Account') : view === 'login' ? 'Sign In' : view === 'forgot' ? 'Send reset link' : 'Update password'} <IonIcon icon={chevronForwardOutline} slot="end" /></>}
+          <IonButton type="submit" expand="block" className="primary-button auth-submit" disabled={loading || (view === 'reset' && !resetToken)}>
+            {loading ? <IonSpinner aria-label="Loading" name="crescent" /> : <>{registering ? (registrationStep === 1 ? 'Continue' : 'Create Account') : view === 'login' ? 'Sign In' : view === 'forgot' ? 'Send reset link' : 'Update password'} <IonIcon aria-hidden="true" icon={chevronForwardOutline} slot="end" /></>}
           </IonButton>
           {view === 'login' || registering ? <p className="auth-switch">{registering ? 'Already have an account?' : "Don't have an account?"} <button className="text-button" type="button" onClick={() => changeView(registering ? 'login' : 'register')}>{registering ? 'Sign in' : 'Sign up'}</button></p> : <p className="auth-switch"><button className="text-button" type="button" onClick={() => changeView('login')}>Back to sign in</button></p>}
         </form>
@@ -466,14 +230,14 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }
 }
 
 function Modal({ isOpen, onClose, title, subtitle, children, wide = false }) {
-  return <IonModal isOpen={isOpen} onDidDismiss={onClose} className={wide ? 'app-modal app-modal-wide' : 'app-modal'}><div className="modal-body"><header className="modal-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><IonIcon icon={closeOutline} /></button></header>{children}</div></IonModal>;
+  return <IonModal isOpen={isOpen} onDidDismiss={onClose} aria-label={title} className={wide ? 'app-modal app-modal-wide' : 'app-modal'}><div className="modal-body"><header className="modal-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><IonIcon aria-hidden="true" icon={closeOutline} /></button></header>{children}</div></IonModal>;
 }
 
 function ModalForm({ children, onSubmit, button, note, busy, error }) {
   return (
-    <form className="modal-form" onSubmit={onSubmit}>{children}{error && <div className="inline-error">{error}</div>}
-      {note && <div className="form-note"><IonIcon icon={checkmarkCircleOutline} /> {note}</div>}
-      <IonButton expand="block" type="submit" className="primary-button" disabled={busy}>{busy ? <IonSpinner name="crescent" /> : <>{button}<IonIcon icon={chevronForwardOutline} slot="end" /></>}</IonButton>
+    <form className="modal-form" onSubmit={onSubmit}>{children}{error && <div className="inline-error" role="alert">{error}</div>}
+      {note && <div className="form-note"><IonIcon aria-hidden="true" icon={checkmarkCircleOutline} /> {note}</div>}
+      <IonButton expand="block" type="submit" className="primary-button" disabled={busy}>{busy ? <IonSpinner aria-label="Loading" name="crescent" /> : <>{button}<IonIcon aria-hidden="true" icon={chevronForwardOutline} slot="end" /></>}</IonButton>
     </form>
   );
 }
@@ -518,23 +282,23 @@ function ProfileEditor({ user, onSave, saving, error, showConsent = false }) {
   return (
     <form className="profile-form" onSubmit={submit}>
       <div className="profile-form-grid">
-        <Field label="First name"><IonInput className="form-input" name="first_name" autocomplete="given-name" value={profile.first_name} onIonInput={update} required maxlength={100} /></Field>
-        <Field label="Middle name (optional)"><IonInput className="form-input" name="middle_name" autocomplete="additional-name" value={profile.middle_name} onIonInput={update} maxlength={100} /></Field>
-        <Field label="Last name"><IonInput className="form-input" name="last_name" autocomplete="family-name" value={profile.last_name} onIonInput={update} required maxlength={100} /></Field>
-        <Field label="Country"><IonInput className="form-input" name="country" autocomplete="country-name" value={profile.country} onIonInput={update} required maxlength={100} /></Field>
-        <Field label="Province / State / Region"><IonInput className="form-input" name="region" autocomplete="address-level1" value={profile.region} onIonInput={update} required maxlength={100} /></Field>
-        <Field label="City / Municipality"><IonInput className="form-input" name="city" autocomplete="address-level2" value={profile.city} onIonInput={update} required maxlength={100} /></Field>
-        <Field label="Barangay (optional)"><IonInput className="form-input" name="barangay" value={profile.barangay} onIonInput={update} maxlength={100} /></Field>
-        <Field label="Street address"><IonInput className="form-input" name="street_address" autocomplete="street-address" value={profile.street_address} onIonInput={update} required maxlength={255} /></Field>
-        <Field label="House / Unit number (optional)"><IonInput className="form-input" name="unit_number" value={profile.unit_number} onIonInput={update} maxlength={100} /></Field>
-        <Field label="Postal code (optional)"><IonInput className="form-input" name="postal_code" autocomplete="postal-code" value={profile.postal_code} onIonInput={update} maxlength={32} /></Field>
-        <Field label="Phone number (optional)"><IonInput className="form-input" name="phone_number" type="tel" autocomplete="tel" value={profile.phone_number} onIonInput={update} maxlength={32} /></Field>
+        <Field label="First name"><IonInput aria-label="First name" className="form-input" name="first_name" autocomplete="given-name" value={profile.first_name} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Middle name (optional)"><IonInput aria-label="Middle name" className="form-input" name="middle_name" autocomplete="additional-name" value={profile.middle_name} onIonInput={update} maxlength={100} /></Field>
+        <Field label="Last name"><IonInput aria-label="Last name" className="form-input" name="last_name" autocomplete="family-name" value={profile.last_name} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Country"><IonInput aria-label="Country" className="form-input" name="country" autocomplete="country-name" value={profile.country} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Province / State / Region"><IonInput aria-label="Region" className="form-input" name="region" autocomplete="address-level1" value={profile.region} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="City / Municipality"><IonInput aria-label="City" className="form-input" name="city" autocomplete="address-level2" value={profile.city} onIonInput={update} required maxlength={100} /></Field>
+        <Field label="Barangay (optional)"><IonInput aria-label="Barangay" className="form-input" name="barangay" value={profile.barangay} onIonInput={update} maxlength={100} /></Field>
+        <Field label="Street address"><IonInput aria-label="Street address" className="form-input" name="street_address" autocomplete="street-address" value={profile.street_address} onIonInput={update} required maxlength={255} /></Field>
+        <Field label="House / Unit number (optional)"><IonInput aria-label="Unit number" className="form-input" name="unit_number" value={profile.unit_number} onIonInput={update} maxlength={100} /></Field>
+        <Field label="Postal code (optional)"><IonInput aria-label="Postal code" className="form-input" name="postal_code" autocomplete="postal-code" value={profile.postal_code} onIonInput={update} maxlength={32} /></Field>
+        <Field label="Phone number (optional)"><IonInput aria-label="Phone number" className="form-input" name="phone_number" type="tel" autocomplete="tel" value={profile.phone_number} onIonInput={update} maxlength={32} /></Field>
       </div>
       <p className="address-privacy-note">Your home location helps personalize household energy settings. Your full address is private and is not shown on the dashboard.</p>
       {showConsent && <label className="consent-field"><input type="checkbox" name="terms_accepted" checked={profile.terms_accepted} onChange={update} required /><span>I agree to the Terms of Service and Privacy Policy.</span></label>}
       {error && <div className="inline-error" role="alert">{error}</div>}
       <IonButton type="submit" expand="block" className="primary-button" disabled={saving}>
-        {saving ? <IonSpinner name="crescent" /> : <>Save and Continue <IonIcon icon={chevronForwardOutline} slot="end" /></>}
+        {saving ? <IonSpinner aria-label="Loading" name="crescent" /> : <>Save and Continue <IonIcon aria-hidden="true" icon={chevronForwardOutline} slot="end" /></>}
       </IonButton>
     </form>
   );
@@ -578,7 +342,7 @@ function AccountSettings({ user, providers, onSave, onConnect, onChangePassword,
         <div className="connected-methods">
           {['google', 'github'].map((provider) => (
             <div className="connected-method" key={provider}>
-              <span>{provider === 'google' ? <IonIcon icon={logoGoogle} /> : <IonIcon icon={logoGithub} />} {provider === 'google' ? 'Google' : 'GitHub'}</span>
+              <span>{provider === 'google' ? <IonIcon aria-hidden="true" icon={logoGoogle} /> : <IonIcon aria-hidden="true" icon={logoGithub} />} {provider === 'google' ? 'Google' : 'GitHub'}</span>
               {providers.includes(provider) ? <strong>Connected</strong> : <button className="text-button" type="button" disabled={!!pendingProvider} onClick={() => connect(provider)}>{pendingProvider === provider ? 'Connecting…' : 'Connect'}</button>}
             </div>
           ))}
@@ -586,9 +350,9 @@ function AccountSettings({ user, providers, onSave, onConnect, onChangePassword,
         </div>
         {providers.includes('password') && <form className="password-change-form" onSubmit={submitPassword}>
           <h3>Change password</h3>
-          <Field label="Current password"><IonInput className="form-input" name="current_password" type="password" autocomplete="current-password" value={password.current_password} onIonInput={(event) => setPassword((previous) => ({ ...previous, current_password: event.detail?.value ?? '' }))} required /></Field>
-          <Field label="New password"><IonInput className="form-input" name="password" type="password" autocomplete="new-password" value={password.password} onIonInput={(event) => setPassword((previous) => ({ ...previous, password: event.detail?.value ?? '' }))} required minlength={8} maxlength={128} /></Field>
-          <Field label="Confirm new password"><IonInput className="form-input" name="password_confirmation" type="password" autocomplete="new-password" value={password.password_confirmation} onIonInput={(event) => setPassword((previous) => ({ ...previous, password_confirmation: event.detail?.value ?? '' }))} required minlength={8} maxlength={128} /></Field>
+          <Field label="Current password"><IonInput aria-label="Current password" className="form-input" name="current_password" type="password" autocomplete="current-password" value={password.current_password} onIonInput={(event) => setPassword((previous) => ({ ...previous, current_password: event.detail?.value ?? '' }))} required /></Field>
+          <Field label="New password"><IonInput aria-label="Password" className="form-input" name="password" type="password" autocomplete="new-password" value={password.password} onIonInput={(event) => setPassword((previous) => ({ ...previous, password: event.detail?.value ?? '' }))} required minlength={8} maxlength={128} /></Field>
+          <Field label="Confirm new password"><IonInput aria-label="Password confirmation" className="form-input" name="password_confirmation" type="password" autocomplete="new-password" value={password.password_confirmation} onIonInput={(event) => setPassword((previous) => ({ ...previous, password_confirmation: event.detail?.value ?? '' }))} required minlength={8} maxlength={128} /></Field>
           {passwordMessage && <p className="form-note" role="status">{passwordMessage}</p>}
           <IonButton type="submit" className="primary-button" disabled={saving}>Update password</IonButton>
         </form>}
@@ -605,14 +369,23 @@ function getInitialTheme() {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function App() {
+function EnergiaApp() {
+  const routerNavigate = useNavigate();
+  const navigateRef = useRef(routerNavigate);
+  useEffect(() => { navigateRef.current = routerNavigate; }, [routerNavigate]);
+  const navigate = useCallback((...args) => navigateRef.current(...args), []);
+  const location = useLocation();
+  const page = NAV.find((item) => `/${item.id}` === location.pathname)?.id || 'overview';
+  const refreshVersion = useRef(0);
+  const sidebarRef = useRef(null);
   const [theme, setTheme] = useState(getInitialTheme);
   const darkMode = theme === 'dark';
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [oauthError, setOauthError] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
+  const [householdsLoaded, setHouseholdsLoaded] = useState(false);
   const [resetToken, setResetToken] = useState('');
-  const [page, setPage] = useState('overview');
   const [households, setHouseholds] = useState([]);
   const [householdId, setHouseholdId] = useState('');
   const [rates, setRates] = useState([]);
@@ -635,19 +408,7 @@ function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [connectedProviders, setConnectedProviders] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [timeFilter, setTimeFilter] = useState('24h');
   const [deviceFilter, setDeviceFilter] = useState('all');
-  const [insightsTimeRange, setInsightsTimeRange] = useState('week');
-  const [smartDeviceToggles, setSmartDeviceToggles] = useState({
-    hvac: true,
-    fridge: true,
-    washer: true,
-    charger: false,
-  });
-  const [mobileQuickToggles, setMobileQuickToggles] = useState({
-    ac: true,
-    fridge: false,
-  });
   const currentHousehold = households.find((item) => item.household_id === Number(householdId));
 
   const toggleTheme = useCallback(() => {
@@ -663,11 +424,20 @@ function App() {
 
   useEffect(() => {
     if (!menuOpen) return undefined;
+    const previousFocus = document.activeElement;
+    const drawer = sidebarRef.current;
+    const focusable = () => [...drawer.querySelectorAll('button, a[href]')].filter((el) => !el.disabled);
+    focusable()[0]?.focus();
     function closeOnEscape(event) {
       if (event.key === 'Escape') setMenuOpen(false);
+      if (event.key === 'Tab') {
+        const items = focusable();
+        if (event.shiftKey && document.activeElement === items[0]) { event.preventDefault(); items.at(-1)?.focus(); }
+        else if (!event.shiftKey && document.activeElement === items.at(-1)) { event.preventDefault(); items[0]?.focus(); }
+      }
     }
     window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    return () => { window.removeEventListener('keydown', closeOnEscape); previousFocus?.focus(); };
   }, [menuOpen]);
 
   function updateFormField(event) {
@@ -690,11 +460,24 @@ function App() {
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('energeia_token');
+    refreshVersion.current += 1;
+    setModal(''); setMenuOpen(false); setNotice(''); setError(''); setResetToken('');
+    setAppliances([]); setSchedules({}); setBills([]); setRecommendations([]); setScenarios([]);
+    setScenarioResults(null); setActiveScenario(null); setConnectedProviders([]);
+    setLoading(false);
+    navigate('/login', { replace: true });
     setUser(null);
+    setHouseholdsLoaded(false);
     setHouseholds([]);
     setHouseholdId('');
     setDashboard(null);
-  }, []);
+  }, [navigate]);
+
+  useEffect(() => {
+    const expired = () => { handleLogout(); setOauthError('Your session expired. Please sign in again.'); };
+    window.addEventListener('energeia:session-expired', expired);
+    return () => window.removeEventListener('energeia:session-expired', expired);
+  }, [handleLogout]);
 
   useEffect(() => {
     const callback = new URLSearchParams(window.location.hash.slice(1));
@@ -702,7 +485,7 @@ function App() {
     const callbackResetToken = callback.get('password_reset');
     const callbackError = callback.get('oauth_error');
     if (callbackToken) localStorage.setItem('energeia_token', callbackToken);
-    if (callbackResetToken) setResetToken(callbackResetToken);
+    if (callbackResetToken) { localStorage.removeItem('energeia_token'); setUser(null); setResetToken(callbackResetToken); navigate('/reset-password', { replace: true }); }
     if (callbackError) {
       const messages = {
         account_exists: 'An account with this email already exists. Sign in with that account, then connect this provider in Account settings.',
@@ -718,52 +501,37 @@ function App() {
     if (callbackToken || callbackResetToken || callbackError) {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     }
+    if (callbackResetToken) { setLoading(false); return; }
     const token = callbackToken || localStorage.getItem('energeia_token');
     if (!token) { setLoading(false); return; }
-    request('/auth/me').then(setUser).catch(handleLogout).finally(() => setLoading(false));
-  }, [handleLogout]);
+    let cancelled = false;
+    request('/auth/me').then((account) => { if (!cancelled && localStorage.getItem('energeia_token') === token) setUser(account); }).catch((exception) => { if (!cancelled && exception.status !== 401) setOauthError(exception.message); }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [handleLogout, navigate]);
 
   const refresh = useCallback(async (id = householdId, { calculate = false } = {}) => {
-    if (!id) return;
-    const query = `?household_id=${id}`;
-    const [
-      applianceData, householdData, rateData, billData, recommendationData, scenarioData,
-    ] = await Promise.all([
-      request(`/households/${id}/appliances`),
-      request('/households'),
-      request('/rates'),
-      request(`/households/${id}/bills`),
-      request(`/households/${id}/recommendations`),
+    const token = localStorage.getItem('energeia_token');
+    if (!id || !token) return;
+    const version = ++refreshVersion.current;
+    if (calculate) await request(`/households/${id}/calculate`, { method: 'POST', body: {} });
+    // Dashboard generates recommendations, so read them only after it completes.
+    const dashData = await request(`/households/${id}/dashboard`);
+    const [applianceData, householdData, rateData, billData, recommendationData, scenarioData] = await Promise.all([
+      request(`/households/${id}/appliances`), request('/households'), request('/rates'),
+      request(`/households/${id}/bills`), request(`/households/${id}/recommendations`),
       request(`/households/${id}/scenarios`),
     ]);
-    const schedulesEntries = await Promise.all(
-      applianceData.map(async (appliance) => [appliance.appliance_id, await request(`/appliances/${appliance.appliance_id}/schedules`)]),
-    );
-    let dashData;
-    if (calculate) {
-      await request(`/households/${id}/calculate`, { method: 'POST', body: {} });
-      const [dashboardData, latestBills] = await Promise.all([
-        request(`/households/${id}/dashboard${query}`),
-        request(`/households/${id}/bills`),
-      ]);
-      dashData = dashboardData;
-      setBills(latestBills);
-    } else {
-      dashData = await request(`/households/${id}/dashboard${query}`);
-      setBills(billData);
-    }
-    setAppliances(applianceData);
-    setHouseholds(householdData);
-    setRates(rateData);
-    setSchedules(Object.fromEntries(schedulesEntries));
-    setRecommendations(recommendationData);
-    setScenarios(scenarioData);
-    setDashboard(dashData);
+    const entries = await Promise.all(applianceData.map(async (appliance) => [appliance.appliance_id, await request(`/appliances/${appliance.appliance_id}/schedules`)]));
+    if (version !== refreshVersion.current || localStorage.getItem('energeia_token') !== token) return;
+    setBills(billData); setAppliances(applianceData); setHouseholds(householdData);
+    setRates(rateData); setSchedules(Object.fromEntries(entries));
+    setRecommendations(recommendationData); setScenarios(scenarioData); setDashboard(dashData);
   }, [householdId]);
 
   const loadHouseholds = useCallback(async () => {
     const result = await request('/households');
     setHouseholds(result);
+    setHouseholdsLoaded(true);
     if (result.length) {
       setHouseholdId((current) => {
         const selected = result.some((household) => household.household_id === Number(current))
@@ -778,15 +546,18 @@ function App() {
   useEffect(() => {
     if (!user?.profile_complete) return;
     loadHouseholds().catch((exception) => { setError(exception.message); setLoading(false); });
-  }, [user, loadHouseholds]);
+  }, [user?.user_id, user?.profile_complete, loadHouseholds]);
 
   useEffect(() => {
     if (!user?.profile_complete || !householdId) return;
+    let cancelled = false;
     setLoading(true);
+    setDashboard(null); setAppliances([]); setSchedules({}); setBills([]); setRecommendations([]); setScenarios([]); setScenarioResults(null); setActiveScenario(null);
     refresh(householdId, { calculate: true })
-      .catch((exception) => setError(exception.message))
-      .finally(() => setLoading(false));
-  }, [user, householdId, refresh]);
+      .catch((exception) => { if (!cancelled) setError(exception.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; refreshVersion.current += 1; };
+  }, [user?.user_id, user?.profile_complete, householdId, refresh]);
 
   useEffect(() => {
     if (!user || page !== 'settings') return;
@@ -848,7 +619,8 @@ function App() {
     setError('');
     try {
       const result = await request('/auth/password/change', { method: 'POST', body: password });
-      setNotice(result.message);
+      handleLogout();
+      setAuthMessage(`${result.message} Sign in with your new password.`);
       return result.message;
     } catch (exception) {
       setError(exception.message);
@@ -859,17 +631,36 @@ function App() {
   }
 
   function changePage(next) {
-    setPage(next);
-    setMenuOpen(false);
-    setError('');
-    if (next === 'overview') refresh(householdId).catch((exception) => setError(exception.message));
+    navigate(`/${next}`);
+    setMenuOpen(false); setModal(''); setSearchQuery('');
+
   }
 
-  if (loading && !user) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
-  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); }} darkMode={darkMode} onToggleTheme={toggleTheme} oauthError={oauthError} resetToken={resetToken} /></IonApp>;
+  useEffect(() => {
+    setMenuOpen(false); setModal('');
+    window.scrollTo?.(0, 0);
+    const name = NAV.find((item) => `/${item.id}` === location.pathname)?.label;
+    document.title = `${name || ({ '/': 'Energy, made visible', '/login': 'Sign in', '/register': 'Create account', '/forgot-password': 'Reset password', '/reset-password': 'Choose a password' }[location.pathname] || 'Page not found')} · Energeia`;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (loading) return;
+    const protectedRoute = NAV.some((item) => `/${item.id}` === location.pathname);
+    if (!user && protectedRoute) navigate(`/login?next=${encodeURIComponent(location.pathname)}`, { replace: true });
+    if (user && ['/', '/login', '/register'].includes(location.pathname)) {
+      const next = new URLSearchParams(location.search).get('next');
+      navigate(NAV.some((item) => `/${item.id}` === next) ? next : '/overview', { replace: true });
+    }
+  }, [loading, user, location.pathname, location.search, navigate]);
+
+  if (loading && !user) return <IonApp><div className="app-loading"><Logo /><IonSpinner aria-label="Loading" name="crescent" /></div></IonApp>;
+  const knownRoute = ['/', '/login', '/register', '/forgot-password', '/reset-password', ...NAV.map((item) => `/${item.id}`)].includes(location.pathname);
+  if (!knownRoute) return <IonApp><main className="not-found"><Logo /><h1>Page not found</h1><p>This address does not match an Energeia page.</p><Link to={user ? '/overview' : '/'}>Return home</Link></main></IonApp>;
+  if (!user && location.pathname === '/' && !oauthError && !resetToken) return <IonApp><LandingPage darkMode={darkMode} onToggleTheme={toggleTheme} /></IonApp>;
+  if (!user) return <IonApp><AuthScreen onLogin={(account) => { setUser(account); setLoading(true); setOauthError(''); setAuthMessage(''); }} darkMode={darkMode} onToggleTheme={toggleTheme} oauthError={oauthError} resetToken={resetToken} authMessage={authMessage} /></IonApp>;
   if (!user.profile_complete) return <IonApp>
     <main className="profile-completion-page">
-      <header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></div></header>
+      <header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><button className="signout-link" onClick={handleLogout}><IonIcon aria-hidden="true" icon={logOutOutline} /> Sign out</button></div></header>
       <section className="profile-completion-card">
         <span className="eyebrow">One last step</span>
         <h1>Complete your profile</h1>
@@ -878,7 +669,7 @@ function App() {
       </section>
     </main>
   </IonApp>;
-  if (loading && !households.length) return <IonApp><div className="app-loading"><Logo /><IonSpinner name="crescent" /></div></IonApp>;
+  if (loading && !households.length) return <IonApp><div className="app-loading"><Logo /><IonSpinner aria-label="Loading" name="crescent" /></div></IonApp>;
 
   const pageTitle = {
     overview: 'Home',
@@ -899,7 +690,7 @@ function App() {
       wattage: Number(formFields.wattage),
       quantity: Number(formFields.quantity ?? editingAppliance?.quantity ?? 1),
     };
-    if (!body.appliance_name || body.wattage <= 0 || body.quantity < 1) {
+    if (!body.appliance_name || !Number.isFinite(body.wattage) || body.wattage <= 0 || !Number.isInteger(body.quantity) || body.quantity < 1) {
       setError('Enter an appliance name, a positive wattage, and a quantity of at least one.');
       return;
     }
@@ -914,7 +705,7 @@ function App() {
   }
 
   async function deleteAppliance(appliance) {
-    if (!window.confirm(`Remove ${appliance.appliance_name}? Appliances with saved usage history cannot be deleted.`)) return;
+    if (!window.confirm(`Remove ${appliance.appliance_name}? Its saved billing history will be preserved by archiving the appliance.`)) return;
     try {
       const result = await act(() => request(`/appliances/${appliance.appliance_id}`, { method: 'DELETE' }), { calculate: true });
       setNotice(result.archived
@@ -928,7 +719,7 @@ function App() {
     const data = new FormData(event.currentTarget);
     const days = WEEKDAYS.filter((day) => data.getAll('days').includes(day));
     const body = { days_of_week: days, hours_per_day: Number(formFields.hours_per_day), start_time: formFields.start_time || null, is_active: data.get('is_active') === 'on' };
-    if (!days.length || body.hours_per_day <= 0 || body.hours_per_day > 24) {
+    if (!days.length || !Number.isFinite(body.hours_per_day) || body.hours_per_day <= 0 || body.hours_per_day > 24) {
       setError('Choose at least one day and enter between 0 and 24 operating hours.');
       return;
     }
@@ -1041,6 +832,7 @@ function App() {
 
   async function runScenario(event) {
     event.preventDefault();
+    setBusy(true); setError('');
     const data = new FormData(event.currentTarget);
     const items = appliances.map((appliance) => {
       const hourValue = data.get(`scenario_hours_${appliance.appliance_id}`);
@@ -1058,7 +850,7 @@ function App() {
       });
       setScenarioResults(result);
       setNotice('Your preview did not change your appliances or usage history.');
-    } catch (exception) { setError(exception.message); }
+    } catch (exception) { setError(exception.message); } finally { setBusy(false); }
   }
 
   async function dismissRecommendation(recommendationId) {
@@ -1070,22 +862,24 @@ function App() {
   async function deleteScenario(scenario) {
     if (!window.confirm(`Delete “${scenario.scenario_name}”? This cannot be undone.`)) return;
     try {
-      await act(() => request(`/households/${householdId}/scenarios/${scenario.scenario_id}`, { method: 'DELETE' }), { success: 'Scenario deleted.', reload: false });
+      await act(() => request(`/households/${householdId}/scenarios/${scenario.scenario_id}`, { method: 'DELETE' }), { success: 'Scenario deleted.' });
       if (activeScenario?.scenario_id === scenario.scenario_id) { setActiveScenario(null); setScenarioResults(null); }
     } catch { /* Preserve the scenario until deletion succeeds. */ }
   }
 
+  if (!householdsLoaded && !loading) return <IonApp><main className="not-found"><Logo /><h1>Your household could not be loaded</h1><p role="alert">{error}</p><button className="text-action" onClick={() => { setLoading(true); loadHouseholds().catch((exception) => { setError(exception.message); setLoading(false); }); }}>Try again</button><button className="text-button" onClick={handleLogout}>Sign out</button></main></IonApp>;
+
   if (user && !households.length && !loading) {
     return <IonApp>
-      <main className="welcome-page"><header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><button className="signout-link" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out</button></div></header>
-        <section className="welcome-card"><div className="welcome-icon"><IonIcon icon={homeOutline} /></div>
+      <main className="welcome-page"><header className="welcome-top"><Logo /><div className="welcome-actions"><ThemeToggle darkMode={darkMode} onToggle={toggleTheme} /><button className="signout-link" onClick={handleLogout}><IonIcon aria-hidden="true" icon={logOutOutline} /> Sign out</button></div></header>
+        <section className="welcome-card"><div className="welcome-icon"><IonIcon aria-hidden="true" icon={homeOutline} /></div>
           <h1>Set up your household</h1>
           <p>Add appliances and an electricity rate to estimate your energy use and bill.</p>
           <form className="welcome-form" onSubmit={saveHousehold}>
-            <Field label="Household name"><IonInput className="form-input" name="household_name" placeholder="e.g. Our home" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
-            <Field label="Address" hint="Optional"><IonInput className="form-input" name="address" placeholder="City or neighbourhood" value={formFields.address ?? ''} onIonInput={updateFormField} maxlength={255} /></Field>
-            {error && <div className="inline-error">{error}</div>}
-            <IonButton expand="block" type="submit" className="primary-button" disabled={busy}>{busy ? <IonSpinner name="crescent" /> : <>Set up my household <IonIcon icon={chevronForwardOutline} slot="end" /></>}</IonButton>
+            <Field label="Household name"><IonInput aria-label="Household name" className="form-input" name="household_name" placeholder="e.g. Our home" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
+            <Field label="Address" hint="Optional"><IonInput aria-label="Address" className="form-input" name="address" placeholder="City or neighbourhood" value={formFields.address ?? ''} onIonInput={updateFormField} maxlength={255} /></Field>
+            {error && <div className="inline-error" role="alert">{error}</div>}
+            <IonButton expand="block" type="submit" className="primary-button" disabled={busy}>{busy ? <IonSpinner aria-label="Loading" name="crescent" /> : <>Set up my household <IonIcon aria-hidden="true" icon={chevronForwardOutline} slot="end" /></>}</IonButton>
           </form>
         </section>
       </main>
@@ -1094,27 +888,29 @@ function App() {
   }
 
   const bars = dashboard?.weekly || [];
-  const maxBar = Math.max(1, ...bars.map((bar) => bar.kwh));
+
   const dismissError = () => setError('');
   const signedInInitial = (user?.full_name || 'U').trim().charAt(0).toUpperCase();
 
   return <IonApp>
-    <IonPage>
-      <IonContent fullscreen className="shell-content">
+    <a className="skip-link" href="#main-content">Skip to content</a>
+    <div className="shell-content">
         <div className="app-shell">
-          <aside id="app-sidebar" className={`sidebar${menuOpen ? ' sidebar-open' : ''}`}>
+          <aside ref={sidebarRef} id="app-sidebar" className={`sidebar${menuOpen ? ' sidebar-open' : ''}`}>
             <Logo />
+            <button className="drawer-close icon-button" aria-label="Close navigation" onClick={() => setMenuOpen(false)}><IonIcon aria-hidden="true" icon={closeOutline} /></button>
             <div className="sidebar-nav-section">
               <span className="sidebar-section-title">MENU</span>
               <nav className="side-nav" aria-label="Main navigation">
                 {NAV.slice(0, 5).map((item, index) => (
                   <button
                     key={item.id}
+                    aria-current={page === item.id ? 'page' : undefined}
                     className={`nav-link${page === item.id ? ' nav-link-active' : ''}`}
                     onClick={() => changePage(item.id)}
                   >
                     <span className="nav-number">0{index + 1}</span>
-                    <IonIcon icon={item.icon} />
+                    <IonIcon aria-hidden="true" icon={item.icon} />
                     <span>{item.label}</span>
                     {page === item.id && <span className="nav-active-dot" />}
                   </button>
@@ -1126,41 +922,19 @@ function App() {
               <span className="sidebar-section-title">ACCOUNT</span>
               <nav className="side-nav" aria-label="Account navigation">
                 <button
+                  aria-current={page === 'settings' ? 'page' : undefined}
                   className={`nav-link${page === 'settings' ? ' nav-link-active' : ''}`}
                   onClick={() => changePage('settings')}
                 >
                   <span className="nav-number">06</span>
-                  <IonIcon icon={settingsOutline} />
+                  <IonIcon aria-hidden="true" icon={settingsOutline} />
                   <span>Account settings</span>
                   {page === 'settings' && <span className="nav-active-dot" />}
-                </button>
-                <button
-                  className="nav-link"
-                  type="button"
-                  onClick={() => setNotice('Support: Reach out to our 24/7 team at support@energeia.app')}
-                >
-                  <IonIcon icon={helpCircleOutline} />
-                  <span>Support</span>
                 </button>
               </nav>
             </div>
 
             <div className="sidebar-spacer" />
-
-            <div className="sidebar-cta-card">
-              <div className="cta-head">
-                <IonIcon icon={leafOutline} />
-                <span className="cta-brand">Energeia Pro</span>
-              </div>
-              <p>Upgrade for smarter AI automation</p>
-              <button
-                type="button"
-                className="sidebar-cta-btn"
-                onClick={() => setNotice('Energeia Pro: Smart load balancing and tariff optimization active.')}
-              >
-                Get Pro
-              </button>
-            </div>
 
             <div className="side-account">
               <span className="avatar">{signedInInitial}</span>
@@ -1169,7 +943,7 @@ function App() {
                 <span>Personal account</span>
               </span>
               <button className="account-out" title="Sign out" onClick={handleLogout}>
-                <IonIcon icon={logOutOutline} />
+                <IonIcon aria-hidden="true" icon={logOutOutline} />
               </button>
             </div>
           </aside>
@@ -1184,7 +958,7 @@ function App() {
                 aria-expanded={menuOpen}
                 onClick={() => setMenuOpen(!menuOpen)}
               >
-                <IonIcon icon={menuOutline} />
+                <IonIcon aria-hidden="true" icon={menuOutline} />
               </button>
 
               <div className={`mobile-header-brand${page === 'overview' ? ' mobile-header-home' : ''}`}>
@@ -1193,30 +967,30 @@ function App() {
               </div>
 
               <div className="topbar-search">
-                <IonIcon icon={searchOutline} />
+                <IonIcon aria-hidden="true" icon={searchOutline} />
                 <input
                   type="search"
-                  placeholder="Search devices or metrics..."
-                  aria-label="Search devices or metrics"
+                  placeholder="Search appliances"
+                  aria-label="Search appliances"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); if (page !== 'appliances') navigate('/appliances'); }}
                 />
               </div>
 
               <div className="breadcrumb">
                 <span>My home</span>
-                <IonIcon icon={chevronForwardOutline} />
+                <IonIcon aria-hidden="true" icon={chevronForwardOutline} />
                 <span className="breadcrumb-current">{currentHousehold?.household_name || 'Your household'}</span>
               </div>
 
               <div className="topbar-right">
                 {households.length > 1 && (
                   <div className="household-picker">
-                    <IonIcon icon={homeOutline} />
+                    <IonIcon aria-hidden="true" icon={homeOutline} />
                     <select
                       value={householdId}
                       aria-label="Select household"
-                      onChange={(event) => { setDashboard(null); setHouseholdId(event.target.value); }}
+                      disabled={busy || loading} onChange={(event) => { setModal(''); setDashboard(null); setHouseholdId(event.target.value); }}
                     >
                       {households.map((household) => (
                         <option key={household.household_id} value={household.household_id}>
@@ -1224,21 +998,21 @@ function App() {
                         </option>
                       ))}
                     </select>
-                    <IonIcon icon={chevronDownOutline} />
+                    <IonIcon aria-hidden="true" icon={chevronDownOutline} />
                   </div>
                 )}
                 <button
                   className="text-action"
                   onClick={() => openModal('rate', Number(selectedRate?.rate_per_kwh) > 0 ? { provider_name: selectedRate.provider_name, rate_per_kwh: selectedRate.rate_per_kwh } : {})}
                 >
-                  <IonIcon icon={flashOutline} />
+                  <IonIcon aria-hidden="true" icon={flashOutline} />
                   <span>{Number(selectedRate?.rate_per_kwh) > 0 ? 'Edit rate' : 'Set rate'}</span>
                 </button>
                 <button
                   className="text-action"
                   onClick={() => { setEditingHousehold(null); openModal('household'); }}
                 >
-                  <IonIcon icon={addOutline} />
+                  <IonIcon aria-hidden="true" icon={addOutline} />
                   <span>New home</span>
                 </button>
                 {currentHousehold && (
@@ -1250,25 +1024,13 @@ function App() {
                       openModal('household', { household_name: currentHousehold.household_name, address: currentHousehold.address || '' });
                     }}
                   >
-                    <IonIcon icon={createOutline} />
+                    <IonIcon aria-hidden="true" icon={createOutline} />
                   </button>
                 )}
                 <ThemeToggle darkMode={darkMode} onToggle={toggleTheme} />
-                <button
-                  className="icon-button notification-bell-btn"
-                  title="Notifications"
-                  aria-label="Notifications"
-                  onClick={() => setNotice('You are up to date. All appliances operating within normal limits.')}
-                >
-                  <IonIcon icon={notificationsOutline} />
-                  <span className="notification-indicator-dot" />
-                </button>
                 <span className="header-divider" />
                 <div
                   className="user-profile-snippet"
-                  onClick={() => openModal('account')}
-                  role="button"
-                  tabIndex={0}
                   title={user?.full_name || user?.email}
                 >
                   <div className="profile-text">
@@ -1276,7 +1038,7 @@ function App() {
                     <span className="profile-role">Home Owner</span>
                   </div>
                   <button
-                    className="header-avatar"
+                    className="header-avatar" onClick={() => openModal('account')}
                     aria-label={`Account: ${user?.full_name || user?.email}`}
                   >
                     {signedInInitial}
@@ -1285,505 +1047,54 @@ function App() {
               </div>
             </header>
 
-            <div className="page-inner">
+            <div className="page-inner" id="main-content" tabIndex={-1}>
               <section className="page-intro">
                 <div>
                   <span className="eyebrow">ENERGY OVERVIEW</span>
                   <h1>{pageTitle}</h1>
-                  <p>Monitor and optimize your renewable energy flow in real-time.</p>
+                  <p>Understand your household energy estimates, one appliance at a time.</p>
                 </div>
                 <div className="intro-actions">
                   <span className="update-stamp">
-                    <IonIcon icon={calendarClearOutline} /> This billing period
+                    <IonIcon aria-hidden="true" icon={calendarClearOutline} /> This billing period
                   </span>
                   <IonButton
                     className="primary-button add-device-pill-btn"
                     onClick={openCreateAppliance}
                   >
-                    <IonIcon icon={addOutline} slot="start" /> Add Device
+                    <IonIcon aria-hidden="true" icon={addOutline} slot="start" /> Add Device
                   </IonButton>
-                  <button
-                    className="export-report-btn"
-                    type="button"
-                    onClick={() => setNotice('Exporting energy report as CSV... Download started.')}
-                  >
-                    Export Report
-                  </button>
                 </div>
               </section>
               {error && (
-                <div className="global-error">
+                <div className="global-error" role="alert">
                   <span>{error}</span>
                   <button className="icon-button" onClick={dismissError} aria-label="Dismiss error">
-                    <IonIcon icon={closeOutline} />
+                    <IonIcon aria-hidden="true" icon={closeOutline} />
                   </button>
                 </div>
               )}
 
-              {page === 'overview' && (
+              {loading && <p role="status" className="loading-status"><IonSpinner aria-label="Loading" name="crescent" /> Loading your household…</p>}
+              {!loading && page === 'overview' && (
                 <section className="view overview-view">
-                  {/* MOBILE VIEW (< 768px) BASED ON REFERENCE IMAGE 1 */}
-                  <div className="mobile-overview-flow">
-                    <div className="mobile-user-greeting">
-                      <div className="greeting-avatar">{signedInInitial}</div>
-                      <div className="greeting-text">
-                        <h2>Good Morning, {user?.first_name || (user?.full_name ? user.full_name.split(' ')[0] : 'there')}</h2>
-                        <p>Here's your energy overview</p>
-                      </div>
-                      <button
-                        className="icon-button mobile-bell-btn"
-                        aria-label="Notifications"
-                        onClick={() => setNotice('System operational: Energeia monitoring active.')}
-                      >
-                        <IonIcon icon={notificationsOutline} />
-                        <span className="notification-indicator-dot" />
-                      </button>
-                    </div>
-
-                    <div className="mobile-gauge-section">
-                      <div className="mobile-section-header">
-                        <h2>Current Usage</h2>
-                        <span className="live-status-pill">
-                          <span className="live-pulsing-dot" /> Live
-                        </span>
-                      </div>
-                      <div className="mobile-gauge-card">
-                        <SemiCircleGauge
-                          value={hasUsage ? fmtKwh(dashboard?.current_kwh) : 2.4}
-                          max={5.0}
-                          unit="kWh"
-                        />
-                        <div className="gauge-stats-row">
-                          <div className="gauge-stat-box">
-                            <span className="stat-label">Estimated cost</span>
-                            <strong className="stat-number">
-                              {hasUsage && Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : '—'}
-                            </strong>
-                            <span className="stat-badge-positive">
-                              {selectedRate?.provider_name ? selectedRate.provider_name : 'Active rate'}
-                            </span>
-                          </div>
-                          <div className="gauge-stat-divider" />
-                          <div className="gauge-stat-box">
-                            <span className="stat-label">Active Devices</span>
-                            <strong className="stat-number">{appliances.length || '0'}</strong>
-                            <span className="stat-subtext">Connected</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mobile-insight-banner" onClick={() => changePage('insights')}>
-                        <div className="insight-badge-icon">
-                          <IonIcon icon={sparklesOutline} />
-                        </div>
-                        <div className="insight-banner-body">
-                          <strong className="insight-heading">Insight</strong>
-                          <p>
-                            {recommendations.length > 0
-                              ? recommendations[0].message
-                              : 'Set schedules for high-draw appliances to lower monthly billing.'}
-                          </p>
-                          <span className="insight-cta">
-                            View suggestions <IonIcon icon={chevronForwardOutline} />
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mobile-quick-control-section">
-                        <div className="mobile-section-header">
-                          <h2>Quick Control</h2>
-                          <button className="see-all-btn" onClick={() => changePage('appliances')}>
-                            See all <IonIcon icon={chevronForwardOutline} />
-                          </button>
-                        </div>
-                        <div className="quick-control-cards-row">
-                          {appliances.length > 0 ? (
-                            appliances.slice(0, 2).map((app, idx) => {
-                              const appSchedules = schedules[app.appliance_id] || [];
-                              const primarySchedule = appSchedules[0];
-                              const isActive = primarySchedule ? primarySchedule.is_active : !mobileQuickToggles[`dev_${app.appliance_id}`];
-                              return (
-                                <div className={`quick-control-card${isActive ? ' is-active' : ''}`} key={app.appliance_id}>
-                                  <div className="quick-card-head">
-                                    <span className={idx === 0 ? 'quick-icon-amber' : 'quick-icon-pink'}>
-                                      <IonIcon
-                                        icon={
-                                          app.category === 'Cooling'
-                                            ? waterOutline
-                                            : app.category === 'Lighting'
-                                            ? bulbOutline
-                                            : flashOutline
-                                        }
-                                      />
-                                    </span>
-                                    <button
-                                      type="button"
-                                      role="switch"
-                                      aria-checked={isActive}
-                                      aria-label={`Toggle ${app.appliance_name}`}
-                                      className={`spring-switch${isActive ? ' is-on' : ''}`}
-                                      onClick={() => {
-                                        if (primarySchedule) {
-                                          setScheduleActive(primarySchedule, !primarySchedule.is_active);
-                                        } else {
-                                          setMobileQuickToggles((p) => ({
-                                            ...p,
-                                            [`dev_${app.appliance_id}`]: !p[`dev_${app.appliance_id}`],
-                                          }));
-                                        }
-                                      }}
-                                    >
-                                      <span className="switch-thumb" />
-                                    </button>
-                                  </div>
-                                  <strong>{app.appliance_name}</strong>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <>
-                              <div className={`quick-control-card${mobileQuickToggles.ac ? ' is-active' : ''}`}>
-                                <div className="quick-card-head">
-                                  <span className="quick-icon-amber">
-                                    <IonIcon icon={waterOutline} />
-                                  </span>
-                                  <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={mobileQuickToggles.ac}
-                                    aria-label="Toggle Air Conditioner"
-                                    className={`spring-switch${mobileQuickToggles.ac ? ' is-on' : ''}`}
-                                    onClick={() => setMobileQuickToggles((p) => ({ ...p, ac: !p.ac }))}
-                                  >
-                                    <span className="switch-thumb" />
-                                  </button>
-                                </div>
-                                <strong>Air Conditioner</strong>
-                              </div>
-
-                              <div className={`quick-control-card${mobileQuickToggles.fridge ? ' is-active' : ''}`}>
-                                <div className="quick-card-head">
-                                  <span className="quick-icon-pink">
-                                    <IonIcon icon={flashOutline} />
-                                  </span>
-                                  <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={mobileQuickToggles.fridge}
-                                    aria-label="Toggle Refrigerator"
-                                    className={`spring-switch${mobileQuickToggles.fridge ? ' is-on' : ''}`}
-                                    onClick={() => setMobileQuickToggles((p) => ({ ...p, fridge: !p.fridge }))}
-                                  >
-                                    <span className="switch-thumb" />
-                                  </button>
-                                </div>
-                                <strong>Refrigerator</strong>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                  <div className="overview-heading"><span className="eyebrow">{PERIOD_LABEL}</span><h2>A clearer picture of your energy.</h2><p>Estimates from your saved wattage, quantities and schedules. Not live meter readings.</p></div>
+                  <div className="dashboard-metrics">
+                    <article className="metric-card metric-card-primary"><span className="metric-label">Estimated energy</span><strong>{dashboard ? fmtKwh(dashboard.current_kwh) : '—'} <small>kWh</small></strong><span className="metric-note">This billing period</span></article>
+                    <article className="metric-card"><span className="metric-label">Estimated bill</span><strong>{Number(selectedRate?.rate_per_kwh) > 0 && dashboard ? fmtMoney(dashboard.estimated_cost) : '—'}</strong><span className="metric-note">{Number(selectedRate?.rate_per_kwh) > 0 ? 'Based on your provider rate' : 'Set your electricity rate to estimate cost'}</span></article>
+                    <article className="metric-card"><span className="metric-label">Your appliances</span><strong>{appliances.length}</strong><span className="metric-note">{Object.values(schedules).flat().filter((item) => item.is_active).length} active schedules</span></article>
+                    <article className="metric-card"><span className="metric-label">Previous period</span><strong>{dashboard?.previous_kwh > 0 ? fmtKwh(dashboard.previous_kwh) : '—'} <small>kWh</small></strong><span className="metric-note">{dashboard?.previous_kwh > 0 ? 'Saved estimated usage' : 'No usage history yet'}</span></article>
                   </div>
-
-                  {/* DESKTOP VIEW (≥ 768px) BASED ON REFERENCE IMAGE 2 */}
-                  <div className="desktop-overview-flow">
-                    <div className="dashboard-metrics">
-                      <article className="metric-card metric-card-primary">
-                        <div className="metric-card-top">
-                          <span className="metric-label">Total Power Generated</span>
-                          <span className="metric-icon-badge badge-primary">
-                            <IonIcon icon={arrowUpOutline} className="metric-arrow-up" />
-                          </span>
-                        </div>
-                        <strong>
-                          {hasUsage ? fmtKwh(dashboard?.current_kwh) : '452.8'}
-                          <small> kWh</small>
-                        </strong>
-                        <span className="metric-note">
-                          <span className="trend-arrow">↗</span> 12% more than last week
-                        </span>
-                      </article>
-
-                      <article className="metric-card">
-                        <div className="metric-card-top">
-                          <span className="metric-label">Current Consumption</span>
-                          <span className="metric-icon-badge">
-                            <IonIcon icon={flashOutline} />
-                          </span>
-                        </div>
-                        <strong>
-                          2.4<small> kW</small>
-                        </strong>
-                        <span className="metric-badge-warning">
-                          <IonIcon icon={warningOutline} /> Peak usage detected
-                        </span>
-                      </article>
-
-                      <article className="metric-card">
-                        <div className="metric-card-top">
-                          <span className="metric-label">Battery Storage Level</span>
-                          <span className="metric-icon-badge">
-                            <IonIcon icon={pulseOutline} />
-                          </span>
-                        </div>
-                        <strong>
-                          84<small> %</small>
-                        </strong>
-                        <span className="metric-badge-success">
-                          <IonIcon icon={checkmarkCircleOutline} /> Charging optimally
-                        </span>
-                      </article>
-
-                      <article className="metric-card">
-                        <div className="metric-card-top">
-                          <span className="metric-label">Grid Status</span>
-                          <span className="metric-icon-badge">
-                            <IonIcon icon={gridOutline} />
-                          </span>
-                        </div>
-                        <div className="grid-online-status">
-                          <span className="online-pill-tag">
-                            <span className="live-pulsing-dot" /> Online
-                          </span>
-                        </div>
-                        <span className="metric-note-subtle">
-                          <IonIcon icon={timeOutline} /> Last sync: 2 min ago
-                        </span>
-                      </article>
-                    </div>
-
-                    <div className="overview-main-row">
-                      <article className="savings-progress-panel">
-                        <div className="panel-header-simple">
-                          <div>
-                            <h3>Savings Progress</h3>
-                            <p>67% of monthly target achieved</p>
-                          </div>
-                          <button
-                            className="icon-button"
-                            aria-label="Savings options"
-                            onClick={() => setNotice('Savings goal target: 500 kWh / month')}
-                          >
-                            <IonIcon icon={ellipsisHorizontal} />
-                          </button>
-                        </div>
-                        <SavingsDonut percentage={67} label="GOAL REACHED" />
-                      </article>
-
-                      <InteractiveBarChart
-                        bars={bars}
-                        maxBar={maxBar}
-                        timeFilter={timeFilter}
-                        onTimeFilterChange={setTimeFilter}
-                      />
-                    </div>
-
-                    <div className="overview-bottom-row">
-                      <article className="smart-devices-panel">
-                        <div className="panel-header-simple">
-                          <h3>Smart Devices</h3>
-                          <button className="plain-link" onClick={() => changePage('appliances')}>
-                            Manage All
-                          </button>
-                        </div>
-                        <div className="smart-devices-grid-2x2">
-                          {appliances.length > 0 ? (
-                            appliances.slice(0, 4).map((app, idx) => {
-                              const appSchedules = schedules[app.appliance_id] || [];
-                              const primarySchedule = appSchedules[0];
-                              const isActive = primarySchedule ? primarySchedule.is_active : !smartDeviceToggles[`dev_${app.appliance_id}`];
-                              const colorClass = ['bg-blue', 'bg-pink', 'bg-amber', 'bg-slate'][idx % 4];
-                              return (
-                                <div className="smart-device-row" key={app.appliance_id}>
-                                  <span className={`device-avatar-icon ${colorClass}`}>
-                                    <IonIcon
-                                      icon={
-                                        app.category === 'Cooling'
-                                          ? waterOutline
-                                          : app.category === 'Lighting'
-                                          ? bulbOutline
-                                          : app.category === 'Kitchen'
-                                          ? flashOutline
-                                          : pulseOutline
-                                      }
-                                    />
-                                  </span>
-                                  <div className="device-meta-copy">
-                                    <strong>{app.appliance_name}</strong>
-                                    <span>{app.category || 'Appliance'} • {app.wattage}W</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={isActive}
-                                    aria-label={`Toggle ${app.appliance_name}`}
-                                    className={`spring-switch${isActive ? ' is-on' : ''}`}
-                                    onClick={() => {
-                                      if (primarySchedule) {
-                                        setScheduleActive(primarySchedule, !primarySchedule.is_active);
-                                      } else {
-                                        setSmartDeviceToggles((p) => ({
-                                          ...p,
-                                          [`dev_${app.appliance_id}`]: !p[`dev_${app.appliance_id}`],
-                                        }));
-                                      }
-                                    }}
-                                  >
-                                    <span className="switch-thumb" />
-                                  </button>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <>
-                              <div className="smart-device-row">
-                                <span className="device-avatar-icon bg-blue">
-                                  <IonIcon icon={waterOutline} />
-                                </span>
-                                <div className="device-meta-copy">
-                                  <strong>HVAC System</strong>
-                                  <span>Heating • Active</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={smartDeviceToggles.hvac}
-                                  aria-label="Toggle HVAC System"
-                                  className={`spring-switch${smartDeviceToggles.hvac ? ' is-on' : ''}`}
-                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, hvac: !p.hvac }))}
-                                >
-                                  <span className="switch-thumb" />
-                                </button>
-                              </div>
-
-                              <div className="smart-device-row">
-                                <span className="device-avatar-icon bg-pink">
-                                  <IonIcon icon={flashOutline} />
-                                </span>
-                                <div className="device-meta-copy">
-                                  <strong>Smart Fridge</strong>
-                                  <span>Eco Mode • Active</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={smartDeviceToggles.fridge}
-                                  aria-label="Toggle Smart Fridge"
-                                  className={`spring-switch${smartDeviceToggles.fridge ? ' is-on' : ''}`}
-                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, fridge: !p.fridge }))}
-                                >
-                                  <span className="switch-thumb" />
-                                </button>
-                              </div>
-
-                              <div className="smart-device-row">
-                                <span className="device-avatar-icon bg-amber">
-                                  <IonIcon icon={bulbOutline} />
-                                </span>
-                                <div className="device-meta-copy">
-                                  <strong>Smart Lighting</strong>
-                                  <span>Eco Mode • Active</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={smartDeviceToggles.washer}
-                                  aria-label="Toggle Smart Lighting"
-                                  className={`spring-switch${smartDeviceToggles.washer ? ' is-on' : ''}`}
-                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, washer: !p.washer }))}
-                                >
-                                  <span className="switch-thumb" />
-                                </button>
-                              </div>
-
-                              <div className="smart-device-row">
-                                <span className="device-avatar-icon bg-slate">
-                                  <IonIcon icon={pulseOutline} />
-                                </span>
-                                <div className="device-meta-copy">
-                                  <strong>EV Charger</strong>
-                                  <span>Disconnected</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  role="switch"
-                                  aria-checked={smartDeviceToggles.charger}
-                                  aria-label="Toggle EV Charger"
-                                  className={`spring-switch${smartDeviceToggles.charger ? ' is-on' : ''}`}
-                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, charger: !p.charger }))}
-                                >
-                                  <span className="switch-thumb" />
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </article>
-
-                      <article className="carbon-offset-panel">
-                        <div className="carbon-circles-bg" aria-hidden="true" />
-                        <div className="carbon-head">
-                          <div>
-                            <h3>Carbon Offset Tracker</h3>
-                            <p>Total environmental impact this year</p>
-                          </div>
-                          <span className="leaderboard-pill">LEADERBOARD TOP 5%</span>
-                        </div>
-                        <div className="carbon-metrics-strip">
-                          <div className="carbon-stat-cell">
-                            <span className="carbon-stat-eyebrow">CO2 AVOIDED</span>
-                            <div className="carbon-stat-figure">
-                              <strong>12.4</strong>
-                              <span>Tons</span>
-                            </div>
-                          </div>
-                          <div className="carbon-stat-cell">
-                            <span className="carbon-stat-eyebrow">TREES EQUIVALENT</span>
-                            <div className="carbon-stat-figure">
-                              <strong>548</strong>
-                              <span>Planted</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="carbon-actions-row">
-                          <button
-                            type="button"
-                            className="carbon-view-btn"
-                            onClick={() => changePage('insights')}
-                          >
-                            View Detailed Impact
-                          </button>
-                          <button
-                            type="button"
-                            className="carbon-share-btn"
-                            aria-label="Share carbon impact"
-                            onClick={() => setNotice('Carbon offset summary copied to clipboard!')}
-                          >
-                            <IonIcon icon={shareSocialOutline} />
-                          </button>
-                        </div>
-                      </article>
-                    </div>
-                  </div>
+                  <UsageChart bars={bars} />
+                  <article className="overview-next"><div><h2>Small changes start with a plan.</h2><p>Compare different hours or appliance quantities without changing your saved schedules.</p></div><button className="plain-link" onClick={() => changePage('scenarios')}>Explore the planner <IonIcon aria-hidden="true" icon={chevronForwardOutline} /></button></article>
+                  <article className="settings-card"><h2>Your appliances</h2><p>{appliances.length ? 'Manage schedules and wattage to keep your estimates useful.' : 'Add your first appliance, then tell us when you use it.'}</p><button className="plain-link" onClick={() => changePage('appliances')}>Manage appliances <IonIcon aria-hidden="true" icon={chevronForwardOutline} /></button></article>
                 </section>
               )}
 
-              {page === 'appliances' && (
+              {!loading && page === 'appliances' && (
                 <section className="view appliances-view">
-                  <div className="appliances-breakdown-card">
-                    <div className="breakdown-head">
-                      <div>
-                        <h2>Total Usage Today</h2>
-                        <p>Real-time device breakdown</p>
-                      </div>
-                      <span className="live-status-pill">
-                        <span className="live-pulsing-dot" /> Live
-                      </span>
-                    </div>
-                    <CategoryDonut centerValue={`${hasUsage ? fmtKwh(dashboard?.current_kwh) : '2.4'} kWh`} />
-                  </div>
-
+                  <p className="scenario-instruction">Estimated usage for {PERIOD_LABEL}. Manage the schedules used in your calculations.</p>
+                  <label className="appliance-search field-label">Find an appliance<input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search by name or category" /></label>
                   <div className="appliance-filter-chips">
                     <button
                       className={`chip-pill${deviceFilter === 'all' ? ' is-active' : ''}`}
@@ -1792,16 +1103,16 @@ function App() {
                       All Devices
                     </button>
                     <button
-                      className={`chip-pill${deviceFilter === 'room' ? ' is-active' : ''}`}
-                      onClick={() => setDeviceFilter('room')}
+                      className={`chip-pill${deviceFilter === 'category' ? ' is-active' : ''}`}
+                      onClick={() => setDeviceFilter('category')}
                     >
-                      By Room
+                      By category
                     </button>
                     <button
                       className={`chip-pill${deviceFilter === 'sort' ? ' is-active' : ''}`}
                       onClick={() => setDeviceFilter((p) => (p === 'sort' ? 'all' : 'sort'))}
                     >
-                      High to Low <IonIcon icon={chevronDownOutline} />
+                      Wattage: high to low <IonIcon aria-hidden="true" icon={chevronDownOutline} />
                     </button>
                   </div>
 
@@ -1816,16 +1127,17 @@ function App() {
                       </div>
                       {appliances.length ? (
                         <div className="appliance-list">
-                          {appliances.map((appliance, index) => {
+                          {!appliances.some((item) => `${item.appliance_name} ${item.category}`.toLowerCase().includes(searchQuery.toLowerCase())) && <p role="status">No appliances match your search.</p>}
+                          {appliances.filter((item) => `${item.appliance_name} ${item.category}`.toLowerCase().includes(searchQuery.toLowerCase())).sort((a, b) => deviceFilter === 'sort' ? Number(b.wattage) - Number(a.wattage) : deviceFilter === 'category' ? (a.category || '').localeCompare(b.category || '') : a.appliance_id - b.appliance_id).map((appliance, index) => {
                             const applianceSchedules = schedules[appliance.appliance_id] || [];
-                            const current = dashboard?.top_appliances?.find((row) => row.appliance_id === appliance.appliance_id);
+                            const current = { current_kwh: Number(appliance.wattage) * Number(appliance.quantity) * Number(appliance.average_hours_per_day) * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() / 1000 };
                             const isHighUsage = Number(appliance.wattage) >= 1000 || appliance.category === 'Cooling';
 
                             return (
                               <article className="appliance-card" key={appliance.appliance_id}>
                                 <div className="appliance-head">
                                   <span className={`appliance-icon appliance-icon-${index % 4}`}>
-                                    <IonIcon
+                                    <IonIcon aria-hidden="true"
                                       icon={
                                         appliance.category === 'Cooling'
                                           ? waterOutline
@@ -1841,7 +1153,7 @@ function App() {
                                     <div className="appliance-title-row">
                                       <h3>{appliance.appliance_name}</h3>
                                       <span className={`device-usage-badge ${isHighUsage ? 'badge-high' : 'badge-normal'}`}>
-                                        {isHighUsage ? 'High Usage' : 'Normal'}
+                                        {isHighUsage ? 'High wattage' : 'Appliance'}
                                       </span>
                                     </div>
                                     <span>
@@ -1863,7 +1175,7 @@ function App() {
                                   </div>
                                   <button
                                     className="icon-button"
-                                    title="Edit appliance"
+                                    title="Edit appliance" aria-label={`Edit ${appliance.appliance_name}`}
                                     onClick={() => {
                                       setEditingAppliance(appliance);
                                       openModal('appliance', {
@@ -1874,14 +1186,14 @@ function App() {
                                       });
                                     }}
                                   >
-                                    <IonIcon icon={createOutline} />
+                                    <IonIcon aria-hidden="true" icon={createOutline} />
                                   </button>
                                   <button
                                     className="icon-button delete-button"
-                                    title="Remove appliance"
+                                    title="Remove appliance" aria-label={`Remove ${appliance.appliance_name}`}
                                     onClick={() => deleteAppliance(appliance)}
                                   >
-                                    <IonIcon icon={trashOutline} />
+                                    <IonIcon aria-hidden="true" icon={trashOutline} />
                                   </button>
                                 </div>
                                 <div className="schedule-divider" />
@@ -1895,7 +1207,7 @@ function App() {
                                       openModal('schedule');
                                     }}
                                   >
-                                    <IonIcon icon={addOutline} /> Add schedule
+                                    <IonIcon aria-hidden="true" icon={addOutline} /> Add schedule
                                   </button>
                                 </div>
                                 {applianceSchedules.length ? (
@@ -1906,7 +1218,7 @@ function App() {
                                         key={schedule.schedule_id}
                                       >
                                         <span className="schedule-indicator">
-                                          {schedule.is_active ? <span /> : <IonIcon icon={closeOutline} />}
+                                          {schedule.is_active ? <span /> : <IonIcon aria-hidden="true" icon={closeOutline} />}
                                         </span>
                                         <div className="schedule-copy">
                                           <strong>{schedule.days_of_week.join(' · ')}</strong>
@@ -1919,7 +1231,7 @@ function App() {
                                         <button
                                           type="button"
                                           role="switch"
-                                          aria-checked={schedule.is_active}
+                                          disabled={busy} aria-checked={schedule.is_active}
                                           className={`spring-switch${schedule.is_active ? ' is-on' : ''}`}
                                           aria-label={`${schedule.is_active ? 'Pause' : 'Activate'} schedule`}
                                           onClick={() => setScheduleActive(schedule, !schedule.is_active)}
@@ -1938,21 +1250,21 @@ function App() {
                                             });
                                           }}
                                         >
-                                          <IonIcon icon={createOutline} />
+                                          <IonIcon aria-hidden="true" icon={createOutline} />
                                         </button>
                                         <button
                                           className="icon-button delete-button subtle-icon"
                                           title="Delete schedule"
                                           onClick={() => deleteSchedule(schedule)}
                                         >
-                                          <IonIcon icon={trashOutline} />
+                                          <IonIcon aria-hidden="true" icon={trashOutline} />
                                         </button>
                                       </div>
                                     ))}
                                   </div>
                                 ) : (
                                   <div className="schedule-empty">
-                                    <IonIcon icon={timeOutline} />
+                                    <IonIcon aria-hidden="true" icon={timeOutline} />
                                     <span>No schedule yet. Add one to estimate usage.</span>
                                   </div>
                                 )}
@@ -1963,11 +1275,11 @@ function App() {
                       ) : (
                         <div className="empty-state">
                           <span className="empty-state-symbol">
-                            <IonIcon icon={flashOutline} />
+                            <IonIcon aria-hidden="true" icon={flashOutline} />
                           </span>
                           <h3>No appliances yet.</h3>
                           <IonButton className="primary-button" onClick={openCreateAppliance}>
-                            <IonIcon icon={addOutline} slot="start" />
+                            <IonIcon aria-hidden="true" icon={addOutline} slot="start" />
                             Add Appliance
                           </IonButton>
                         </div>
@@ -1977,7 +1289,7 @@ function App() {
                 </section>
               )}
 
-              {page === 'history' && (
+              {!loading && page === 'history' && (
                 <section className="view">
                   <article className="history-callout">
                     <div>
@@ -2003,7 +1315,7 @@ function App() {
                     </div>
                     {hasUsage && (
                       <IonButton className="primary-button compact-button" onClick={calculateCurrentPeriod}>
-                        <IonIcon icon={pulseOutline} slot="start" />
+                        <IonIcon aria-hidden="true" icon={pulseOutline} slot="start" />
                         Save this period
                       </IonButton>
                     )}
@@ -2014,7 +1326,7 @@ function App() {
                     </div>
                   </div>
                   {bills.length ? (
-                    <div className="bill-table-wrap">
+                    <div className="bill-table-wrap" role="region" aria-label="Billing history, scroll horizontally for all columns" tabIndex={0}>
                       <table className="bill-table">
                         <thead>
                           <tr>
@@ -2081,7 +1393,7 @@ function App() {
                                     {fmtMoney(Math.abs(Number(bill.actual_bill_amount) - Number(bill.estimated_cost)))}
                                   </span>
                                 ) : (
-                                  <IonIcon className="bill-arrow" icon={chevronForwardOutline} />
+                                  <IonIcon aria-hidden="true" className="bill-arrow" icon={chevronForwardOutline} />
                                 )}
                               </td>
                             </tr>
@@ -2092,7 +1404,7 @@ function App() {
                   ) : (
                     <div className="empty-inline history-empty">
                       <span className="empty-icon">
-                        <IonIcon icon={calendarClearOutline} />
+                        <IonIcon aria-hidden="true" icon={calendarClearOutline} />
                       </span>
                       <div>
                         <strong>No billing periods saved yet.</strong>
@@ -2101,68 +1413,18 @@ function App() {
                         </p>
                       </div>
                       <button className="plain-link" onClick={() => changePage('appliances')}>
-                        Manage appliances <IonIcon icon={chevronForwardOutline} />
+                        Manage appliances <IonIcon aria-hidden="true" icon={chevronForwardOutline} />
                       </button>
                     </div>
                   )}
                 </section>
               )}
 
-              {page === 'insights' && (
+              {!loading && page === 'insights' && (
                 <section className="view insights-view">
-                  <div className="insights-filter-chips">
-                    {['Day', 'Week', 'Month', 'Year'].map((tab) => (
-                      <button
-                        key={tab}
-                        className={`insights-tab-pill${insightsTimeRange === tab.toLowerCase() ? ' is-active' : ''}`}
-                        onClick={() => setInsightsTimeRange(tab.toLowerCase())}
-                      >
-                        {tab}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="insights-energy-banner">
-                    <div className="banner-metric-block">
-                      <span className="banner-eyebrow">Energy Usage</span>
-                      <div className="banner-figure-row">
-                        <strong>18.7<small> kWh</small></strong>
-                        <span className="banner-trend-green">+12% vs last week</span>
-                      </div>
-                      <span className="banner-subtext">This {insightsTimeRange}</span>
-                    </div>
-                  </div>
-
-                  <div className="section-row">
-                    <div>
-                      <h2>Smart Insights</h2>
-                    </div>
-                    <span className="plain-meta">{recommendations.length + 2}</span>
-                  </div>
-
+                  <div className="section-row"><div><h2>Suggestions for your home</h2><p>Based on your current appliance schedules.</p></div><span className="plain-meta">{recommendations.length}</span></div>
+                  {!recommendations.length && <div className="empty-inline"><p>No suggestions yet. Add appliances and active schedules, or revisit after updating your usage.</p></div>}
                   <div className="smart-insights-list">
-                    <article className="smart-insight-card">
-                      <div className="insight-blue-badge">
-                        <IonIcon icon={sparklesOutline} />
-                      </div>
-                      <div className="smart-insight-copy">
-                        <strong>Great Job</strong>
-                        <p>You used 18% less energy compared to last week.</p>
-                      </div>
-                      <IonIcon icon={chevronForwardOutline} className="insight-chev" />
-                    </article>
-
-                    <article className="smart-insight-card">
-                      <div className="insight-blue-badge">
-                        <IonIcon icon={flashOutline} />
-                      </div>
-                      <div className="smart-insight-copy">
-                        <strong>Save up to 15% this month</strong>
-                        <p>Run your washing machine and water heater at night (10PM - 6AM).</p>
-                      </div>
-                      <IonIcon icon={chevronForwardOutline} className="insight-chev" />
-                    </article>
-
                     {recommendations.map((recommendation) => (
                       <article className="recommendation-card" key={recommendation.recommendation_id}>
                         <div className="recommendation-content">
@@ -2172,7 +1434,7 @@ function App() {
                             Number(recommendation.potential_savings_cost) > 0) && (
                             <div className="recommendation-savings">
                               <span>
-                                <IonIcon icon={trendingDownOutline} /> Potential savings
+                                <IonIcon aria-hidden="true" icon={trendingDownOutline} /> Potential savings
                               </span>
                               <strong>
                                 {Number(recommendation.potential_savings_kwh) > 0 && (
@@ -2191,22 +1453,21 @@ function App() {
                           className="dismiss-button"
                           onClick={() => dismissRecommendation(recommendation.recommendation_id)}
                         >
-                          Dismiss <IonIcon icon={closeOutline} />
+                          Dismiss <IonIcon aria-hidden="true" icon={closeOutline} />
                         </button>
                       </article>
                     ))}
                   </div>
                   {!!recommendations.length && (
-                    <p className="recommendation-note">Potential savings are estimates based on standard utility calculations.</p>
+                    <p className="recommendation-note">Potential savings are estimates from the suggested schedule changes and your configured rate. Actual usage may differ.</p>
                   )}
                 </section>
               )}
 
-              {page === 'scenarios' && (
+              {!loading && page === 'scenarios' && (
                 <section className="view">
                   <p className="scenario-instruction">
-                    Adjust appliance usage to compare estimated costs. Preview changes do not affect your schedules
-                    unless you save them.
+                    Adjust appliance usage to compare estimated costs. Previews and saved plans never change your appliance schedules.
                   </p>
                   <div className="scenario-actions">
                     <button
@@ -2214,7 +1475,7 @@ function App() {
                       onClick={() => openModal('scenario-create')}
                       disabled={!appliances.length}
                     >
-                      <IonIcon icon={addOutline} /> Make a plan
+                      <IonIcon aria-hidden="true" icon={addOutline} /> Make a plan
                     </button>
                   </div>
                   <div className="section-row">
@@ -2223,7 +1484,7 @@ function App() {
                     </div>
                     <span className="plain-meta">{scenarios.length}</span>
                   </div>
-                  {scenarios.length ? (
+                  {(scenarios.length > 0 || scenarioResults) ? (
                     <div className="scenario-layout">
                       <div className="scenario-list">
                         {scenarios.map((scenario, index) => (
@@ -2250,14 +1511,14 @@ function App() {
                                 {fmtMoney(scenario.scenario_cost)}
                                 <span>estimated bill</span>
                               </span>
-                              <IonIcon icon={chevronForwardOutline} />
+                              <IonIcon aria-hidden="true" icon={chevronForwardOutline} />
                             </button>
                             <button
                               className="icon-button delete-button"
                               aria-label={`Delete ${scenario.scenario_name}`}
                               onClick={() => deleteScenario(scenario)}
                             >
-                              <IonIcon icon={trashOutline} />
+                              <IonIcon aria-hidden="true" icon={trashOutline} />
                             </button>
                           </article>
                         ))}
@@ -2280,7 +1541,7 @@ function App() {
                               Number(scenarioResults.savings_cost) >= 0 ? '' : ' compare-increase'
                             }`}
                           >
-                            <IonIcon
+                            <IonIcon aria-hidden="true"
                               icon={Number(scenarioResults.savings_cost) >= 0 ? trendingDownOutline : arrowUpOutline}
                             />
                             <span>{Number(scenarioResults.savings_cost) >= 0 ? 'Potential savings' : 'Potential increase'}</span>
@@ -2311,7 +1572,7 @@ function App() {
                   ) : (
                     <div className="empty-inline scenario-empty">
                       <span className="empty-icon">
-                        <IonIcon icon={bulbOutline} />
+                        <IonIcon aria-hidden="true" icon={bulbOutline} />
                       </span>
                       <div>
                         <strong>No plans yet.</strong>
@@ -2319,12 +1580,12 @@ function App() {
                       </div>
                       {appliances.length > 0 && (
                         <button className="plain-link" onClick={() => openModal('scenario-create')}>
-                          Make a plan <IonIcon icon={chevronForwardOutline} />
+                          Make a plan <IonIcon aria-hidden="true" icon={chevronForwardOutline} />
                         </button>
                       )}
                     </div>
                   )}
-                  {scenarioResults && appliances.length > 0 && (
+                  {appliances.length > 0 && (
                     <>
                       <div className="section-row scenario-edit-heading">
                         <div>
@@ -2346,7 +1607,7 @@ function App() {
                               <input
                                 className="small-native-input"
                                 type="number"
-                                name={`scenario_hours_${appliance.appliance_id}`}
+                                aria-label={`Hours per day for ${appliance.appliance_name}`} name={`scenario_hours_${appliance.appliance_id}`}
                                 min="0"
                                 max="24"
                                 step=".25"
@@ -2358,7 +1619,7 @@ function App() {
                               <input
                                 className="small-native-input"
                                 type="number"
-                                name={`scenario_quantity_${appliance.appliance_id}`}
+                                aria-label={`Quantity for ${appliance.appliance_name}`} name={`scenario_quantity_${appliance.appliance_id}`}
                                 min="1"
                                 step="1"
                                 placeholder={String(appliance.quantity)}
@@ -2368,8 +1629,8 @@ function App() {
                         ))}
                         <div className="preview-actions">
                           <span>Leave a field empty to keep its current setting.</span>
-                          <button type="submit" className="plain-link">
-                            <IonIcon icon={playOutline} /> Preview changes
+                          <button type="submit" className="plain-link" disabled={busy}>
+                            <IonIcon aria-hidden="true" icon={playOutline} /> Preview changes
                           </button>
                         </div>
                       </form>
@@ -2395,7 +1656,7 @@ function App() {
                     error={error}
                   />
                   <button className="logout-modal-button settings-signout" onClick={handleLogout}>
-                    <IonIcon icon={logOutOutline} /> Sign out of Energeia
+                    <IonIcon aria-hidden="true" icon={logOutOutline} /> Sign out of Energeia
                   </button>
                 </section>
               )}
@@ -2411,67 +1672,66 @@ function App() {
                 onClick={() => changePage(item.id)}
               >
                 <div className="mobile-nav-pill">
-                  <IonIcon icon={item.icon} />
+                  <IonIcon aria-hidden="true" icon={item.icon} />
                 </div>
                 <span>{item.mobileLabel}</span>
               </button>
             ))}
           </nav>
         </div>
-      </IonContent>
+      </div>
       <IonToast isOpen={!!notice} message={notice} duration={3000} position="top" onDidDismiss={() => setNotice('')} />
 
       <Modal isOpen={modal === 'appliance'} onClose={() => setModal('')} title={editingAppliance ? 'Edit appliance' : 'Add appliance'} subtitle={editingAppliance ? 'Saved usage history will be preserved.' : 'Add a schedule after saving to estimate usage.'}>
         <ModalForm busy={busy} error={error} onSubmit={saveAppliance} button={editingAppliance ? 'Save changes' : 'Add appliance'}>
-          <Field label="Appliance name"><IonInput className="form-input" name="appliance_name" placeholder="e.g. Living room air conditioner" value={formFields.appliance_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
-          <div className="form-row"><Field label="Category"><IonSelect className="form-input form-select" name="category" value={formFields.category ?? 'Cooling'} onIonChange={updateFormField} interface="popover">{CATEGORIES.map((category) => <IonSelectOption key={category} value={category}>{category}</IonSelectOption>)}</IonSelect></Field><Field label="Wattage"><IonInput className="form-input" name="wattage" type="number" min="0.01" max="100000" step="any" placeholder="e.g. 950" value={formFields.wattage ?? ''} onIonInput={updateFormField} required /><span className="field-hint">Look for the W rating on the label.</span></Field></div>
-          <Field label="Number in your household"><IonInput className="form-input" name="quantity" type="number" min="1" max="999" step="1" value={formFields.quantity ?? 1} onIonInput={updateFormField} required /></Field>
+          <Field label="Appliance name"><IonInput aria-label="Appliance name" className="form-input" name="appliance_name" placeholder="e.g. Living room air conditioner" value={formFields.appliance_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
+          <div className="form-row"><Field label="Category"><IonSelect aria-label="Category" className="form-input form-select" name="category" value={formFields.category ?? 'Cooling'} onIonChange={updateFormField} interface="popover">{CATEGORIES.map((category) => <IonSelectOption key={category} value={category}>{category}</IonSelectOption>)}</IonSelect></Field><Field label="Wattage"><IonInput aria-label="Wattage" className="form-input" name="wattage" type="number" min="0.01" max="100000" step="any" placeholder="e.g. 950" value={formFields.wattage ?? ''} onIonInput={updateFormField} required /><span className="field-hint">Look for the W rating on the label.</span></Field></div>
+          <Field label="Number in your household"><IonInput aria-label="Quantity" className="form-input" name="quantity" type="number" min="1" max="999" step="1" value={formFields.quantity ?? 1} onIonInput={updateFormField} required /></Field>
         </ModalForm>
       </Modal>
 
       <Modal isOpen={modal === 'schedule'} onClose={() => setModal('')} title={editingSchedule ? 'Edit schedule' : 'Add usage schedule'} subtitle={activeScenario?.appliance_name || 'Appliance'}>
         <ModalForm busy={busy} error={error} key={`${editingSchedule?.schedule_id || activeScenario?.appliance_id || 'new'}`} onSubmit={saveSchedule} button="Save schedule">
           <div className="field-label">Days of the week<div className="weekday-grid">{WEEKDAYS.map((day) => { const checked = editingSchedule?.days_of_week.includes(day) ?? false; return <label className="weekday-chip" key={day}><input type="checkbox" name="days" value={day} defaultChecked={checked} /><span>{day.slice(0, 1)}</span><small>{day}</small></label>; })}</div></div>
-          <Field label="Operating hours per day" hint="An estimate is just fine. Add another schedule if the hours change on different days."><IonInput className="form-input" name="hours_per_day" type="number" min="0.25" max="24" step="0.25" placeholder="e.g. 8" value={formFields.hours_per_day ?? ''} onIonInput={updateFormField} required /></Field>
-          <Field label="Usual start time"><IonInput className="form-input" name="start_time" type="time" value={formFields.start_time ?? ''} onIonInput={updateFormField} /></Field>
+          <Field label="Operating hours per day" hint="An estimate is just fine. Add another schedule if the hours change on different days."><IonInput aria-label="Hours per day" className="form-input" name="hours_per_day" type="number" min="0.25" max="24" step="0.25" placeholder="e.g. 8" value={formFields.hours_per_day ?? ''} onIonInput={updateFormField} required /></Field>
+          <Field label="Usual start time"><IonInput aria-label="Start time" className="form-input" name="start_time" type="time" value={formFields.start_time ?? ''} onIonInput={updateFormField} /></Field>
           <label className="check-field"><input type="checkbox" name="is_active" defaultChecked={editingSchedule?.is_active ?? true} /><span>Include this schedule in my energy estimates</span></label>
         </ModalForm>
       </Modal>
 
       <Modal isOpen={modal === 'household'} onClose={() => { setModal(''); setEditingHousehold(null); }} title={editingHousehold ? 'Edit household' : 'Add household'}>
         <ModalForm busy={busy} error={error} onSubmit={saveHousehold} button={editingHousehold ? 'Save household details' : 'Add household'}>
-          <Field label="Household name"><IonInput className="form-input" name="household_name" placeholder="e.g. Weekend cottage" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
-          <Field label="Address"><IonInput className="form-input" name="address" placeholder="City or neighbourhood (optional)" value={formFields.address ?? ''} onIonInput={updateFormField} maxlength={255} /></Field>
+          <Field label="Household name"><IonInput aria-label="Household name" className="form-input" name="household_name" placeholder="e.g. Weekend cottage" value={formFields.household_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
+          <Field label="Address"><IonInput aria-label="Address" className="form-input" name="address" placeholder="City or neighbourhood (optional)" value={formFields.address ?? ''} onIonInput={updateFormField} maxlength={255} /></Field>
         </ModalForm>
       </Modal>
 
       <Modal isOpen={modal === 'account'} onClose={() => setModal('')} title="Account">
         <div className="account-card-content"><span className="account-detail-avatar">{signedInInitial}</span><div className="account-detail"><span className="eyebrow">YOUR ACCOUNT</span><strong>{user.full_name || user.email}</strong><span>{user.email}</span></div></div>
         <button className="text-button account-settings-link" onClick={() => { setModal(''); changePage('settings'); }}>Manage account settings</button>
-        <button className="logout-modal-button" onClick={handleLogout}><IonIcon icon={logOutOutline} /> Sign out of Energeia</button>
+        <button className="logout-modal-button" onClick={handleLogout}><IonIcon aria-hidden="true" icon={logOutOutline} /> Sign out of Energeia</button>
       </Modal>
 
       <Modal isOpen={modal === 'rate'} onClose={() => setModal('')} title="Electricity rate" subtitle="Saved bills keep their original rate.">
         <ModalForm busy={busy} error={error} onSubmit={saveRate} button="Save electricity rate" note={Number(selectedRate?.rate_per_kwh) > 0 ? `Current: ${selectedRate.provider_name} · ₱${Number(selectedRate.rate_per_kwh).toFixed(2)} per kWh` : 'Your first provider and rate will be used in future bill estimates.'}>
-          <Field label="Electricity provider"><IonInput className="form-input" name="provider_name" placeholder="e.g. Meralco" value={formFields.provider_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
-          <Field label="Rate per kilowatt-hour (₱/kWh)" hint="Usually listed on your electricity bill."><IonInput className="form-input" name="rate_per_kwh" type="number" min="0.0001" max="999999" step=".0001" placeholder="e.g. 11.5000" value={formFields.rate_per_kwh ?? ''} onIonInput={updateFormField} required /></Field>
+          <Field label="Electricity provider"><IonInput aria-label="Provider name" className="form-input" name="provider_name" placeholder="e.g. Meralco" value={formFields.provider_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
+          <Field label="Rate per kilowatt-hour (₱/kWh)" hint="Usually listed on your electricity bill."><IonInput aria-label="Rate per kwh" className="form-input" name="rate_per_kwh" type="number" min="0.0001" max="999999" step=".0001" placeholder="e.g. 11.5000" value={formFields.rate_per_kwh ?? ''} onIonInput={updateFormField} required /></Field>
         </ModalForm>
       </Modal>
 
       <Modal isOpen={modal === 'actual-bill'} onClose={() => setModal('')} title="Add actual bill" subtitle={`Your estimate for ${activeScenario?.period_start || ''} will be kept.`}>
         <ModalForm busy={busy} error={error} onSubmit={saveActualBill} button="Save actual bill">
-          <Field label="Actual bill amount (₱)"><IonInput className="form-input" name="actual_bill_amount" type="number" min="0" max="999999999" step=".01" placeholder="e.g. 2,486.50" value={formFields.actual_bill_amount ?? ''} onIonInput={updateFormField} required /></Field>
+          <Field label="Actual bill amount (₱)"><IonInput aria-label="Actual bill amount" className="form-input" name="actual_bill_amount" type="number" min="0" max="999999999" step=".01" placeholder="e.g. 2,486.50" value={formFields.actual_bill_amount ?? ''} onIonInput={updateFormField} required /></Field>
         </ModalForm>
       </Modal>
 
       <Modal isOpen={modal === 'scenario-create'} onClose={() => setModal('')} title="Save what-if plan" subtitle="Saving a plan does not change appliance schedules.">
         <ModalForm busy={busy} error={error} onSubmit={saveScenario} button="Save my what-if plan">
-          <Field label="Give your idea a name"><IonInput className="form-input" name="scenario_name" placeholder="e.g. Quieter air-con evenings" value={formFields.scenario_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
+          <Field label="Give your idea a name"><IonInput aria-label="Scenario name" className="form-input" name="scenario_name" placeholder="e.g. Quieter air-con evenings" value={formFields.scenario_name ?? ''} onIonInput={updateFormField} required maxlength={150} /></Field>
           {appliances.map((appliance) => <div className="scenario-form-appliance" key={appliance.appliance_id}><strong>{appliance.appliance_name}</strong><div><label className="inline-field">Hours/day<input className="small-native-input" type="number" name={`hours_${appliance.appliance_id}`} min="0" max="24" step=".25" placeholder={Number(appliance.average_hours_per_day || 0).toFixed(1)} /></label><label className="inline-field">Quantity<input className="small-native-input" type="number" name={`quantity_${appliance.appliance_id}`} min="1" max="999" step="1" placeholder={String(appliance.quantity)} /></label></div><span>Leave blank to keep the current setting.</span></div>)}
         </ModalForm>
       </Modal>
-    </IonPage>
   </IonApp>;
 }
 
-export default App;
+export default function App() { return <BrowserRouter><EnergiaApp /></BrowserRouter>; }

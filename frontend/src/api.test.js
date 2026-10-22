@@ -30,3 +30,39 @@ describe('API errors', () => {
       .rejects.toThrow('That email and password do not match.');
   });
 });
+
+
+describe('session and response reliability', () => {
+  it('clears an expired session and notifies the app', async () => {
+    localStorage.setItem('energeia_token', 'expired');
+    const listener = vi.fn();
+    window.addEventListener('energeia:session-expired', listener);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"detail":"Expired"}', { status: 401 })));
+    await expect(request('/households')).rejects.toMatchObject({ status: 401 });
+    expect(localStorage.getItem('energeia_token')).toBeNull();
+    expect(listener).toHaveBeenCalledOnce();
+    window.removeEventListener('energeia:session-expired', listener);
+  });
+
+  it('does not expire a newer session after an older request fails', async () => {
+    localStorage.setItem('energeia_token', 'old');
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => {
+      localStorage.setItem('energeia_token', 'new');
+      return new Response('{"detail":"Expired"}', { status: 401 });
+    }));
+    await expect(request('/households')).rejects.toThrow('Expired');
+    expect(localStorage.getItem('energeia_token')).toBe('new');
+  });
+
+  it('keeps the session when the current password is wrong', async () => {
+    localStorage.setItem('energeia_token', 'valid');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({detail:'Your current password is incorrect.'}), { status: 401 })));
+    await expect(request('/auth/password/change', { method: 'POST', body: {} })).rejects.toThrow('current password is incorrect');
+    expect(localStorage.getItem('energeia_token')).toBe('valid');
+  });
+
+  it('rejects invalid successful responses instead of rendering null data', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>Unavailable</html>')));
+    await expect(request('/households')).rejects.toThrow('invalid response');
+  });
+});
