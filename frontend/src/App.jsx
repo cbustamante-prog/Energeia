@@ -529,7 +529,9 @@ function EnergiaApp() {
   }, [householdId]);
 
   const loadHouseholds = useCallback(async () => {
+    const token = localStorage.getItem('energeia_token');
     const result = await request('/households');
+    if (localStorage.getItem('energeia_token') !== token) return;
     setHouseholds(result);
     setHouseholdsLoaded(true);
     if (result.length) {
@@ -545,6 +547,7 @@ function EnergiaApp() {
 
   useEffect(() => {
     if (!user?.profile_complete) return;
+    setLoading(true);
     loadHouseholds().catch((exception) => { setError(exception.message); setLoading(false); });
   }, [user?.user_id, user?.profile_complete, loadHouseholds]);
 
@@ -669,7 +672,7 @@ function EnergiaApp() {
       </section>
     </main>
   </IonApp>;
-  if (loading && !households.length) return <IonApp><div className="app-loading"><Logo /><IonSpinner aria-label="Loading" name="crescent" /></div></IonApp>;
+  if ((!householdsLoaded && !error) || (loading && !households.length)) return <IonApp><div className="app-loading"><Logo /><IonSpinner aria-label="Loading" name="crescent" /></div></IonApp>;
 
   const pageTitle = {
     overview: 'Home',
@@ -1335,7 +1338,7 @@ function EnergiaApp() {
                             <th>ESTIMATED USAGE</th>
                             <th>ESTIMATED BILL</th>
                             <th>ACTUAL BILL</th>
-                            <th />
+                            <th scope="col">DIFFERENCE</th>
                           </tr>
                         </thead>
                         <tbody>

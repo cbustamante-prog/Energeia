@@ -232,3 +232,11 @@ ion-app.ion-page { color: var(--text); }
 .metric-card-primary>strong, .metric-card-primary>strong small { color: #fff; }
 .metric-card-primary>.metric-label, .metric-card-primary>.metric-note { color: #e5f1e9; }
 @media(max-width:360px) { .dashboard-metrics { grid-template-columns: minmax(0,1fr); } }
+.bill-table th { color: var(--text-muted); background: var(--surface-soft); }
+.bill-delta { color: var(--text); background: var(--surface-soft); }
+.empty-inline>div>strong { color: var(--text); }
+.history-callout>div>.eyebrow, .history-callout>div>p, .history-callout h2>span,
+.bill-table tbody td>span, .bill-table tbody td strong>span { color: var(--text-muted); font-size: 14px; }
+.page-intro .eyebrow { color: var(--text-muted); }
+.history-callout h2>span:not(.history-divider), .bill-table td:first-child>span,
+.bill-table td:nth-child(2)>span { color: var(--text-muted); font-size: 14px; }

@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { chromium, expect } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Attach to the shared Preview browser; never launch a separate hidden browser.
 const origin = 'http://localhost:5173';
@@ -55,13 +57,13 @@ before(async () => {
 });
 afterEach(async (t) => {
   if (!t.passed) {
-    await page.screenshot({path:'/tmp/energia-browser-failure.png'});
+    await page.screenshot({path:join(tmpdir(), 'energia-browser-failure.png')});
     console.log('Form diagnostics', await page.locator('ion-modal.show-modal').evaluateAll(els=>els.map(el=>({text:el.textContent,invalid:[...el.querySelectorAll('input')].filter(x=>!x.validity.valid).map(x=>({name:x.name,message:x.validationMessage})),values:[...el.querySelectorAll('input')].filter(x=>x.type==='checkbox').map(x=>({name:x.name,checked:x.checked}))}))));
     console.log('Failure layout', await page.evaluate(()=>({url:location.pathname,scrollY,height:document.documentElement.scrollHeight,overflow:[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>document.documentElement.clientWidth+1 && getComputedStyle(e).position!=='fixed').slice(0,12).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,right:e.getBoundingClientRect().right}))})));
   }
 });
 after(async () => {
-  await writeFile('/tmp/energia-browser-measurements.json', JSON.stringify(measurements,null,2));
+  await writeFile(join(tmpdir(), 'energia-browser-measurements.json'), JSON.stringify(measurements,null,2));
   await browser?.close(); // Disconnects CDP; shared browser remains running.
 });
 

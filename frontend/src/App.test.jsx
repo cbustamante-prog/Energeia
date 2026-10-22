@@ -33,6 +33,24 @@ describe('Energeia', () => {
   });
 
 
+  it('waits for household loading before showing a failure state', async () => {
+    let finishHouseholds;
+    const pendingHouseholds = new Promise((resolve) => { finishHouseholds = resolve; });
+    localStorage.setItem('energeia_token', 'test-token');
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true, status: 200,
+      json: async () => url.endsWith('/auth/me')
+        ? { user_id: 1, profile_complete: true, full_name: 'Alex' }
+        : pendingHouseholds,
+    })));
+    const { container } = render(<App />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/households'), expect.any(Object)));
+    expect(container.querySelector('.app-loading')).toBeTruthy();
+    expect(screen.queryByText('Your household could not be loaded')).toBeNull();
+    finishHouseholds([]);
+    expect(await screen.findByRole('heading', { name: 'Set up your household' })).toBeTruthy();
+  });
+
   it('loads the real sign-in route', async () => {
     const { container } = render(<App />);
 
