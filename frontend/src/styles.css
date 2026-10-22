@@ -34,7 +34,7 @@ ion-content.shell-content{--background:var(--surface-soft)}
 .highlight-icon svg{width:15px;height:15px}
 .auth-foot{position:relative;display:flex;gap:9px;align-items:center;font-size:13.5px;color:#d7e0cfab}
 .auth-foot span{font-size:9px;color:#d6bb83}
-.auth-right{display:flex;align-items:center;justify-content:center;padding:58px 35px}
+.auth-right{display:flex;align-items:center;justify-content:center;padding:58px 35px;overflow-y:auto}
 .auth-card{width:min(410px,100%)}
 .auth-mini{display:flex;align-items:center;justify-content:space-between;padding-bottom:43px}
 .secure-label{font-size:11.5px;letter-spacing:1.1px;color:#99968b}
@@ -2374,7 +2374,7 @@ html[data-theme="dark"] .insights-tab-pill.is-active {
 .scenario-actions{margin-bottom:18px}
 .auth-page{background:var(--surface-soft);color:var(--text)}
 .auth-left{min-height:100%;background:#3e684f}
-.auth-right{background:var(--surface-soft);color:var(--text)}
+.auth-right{background:var(--surface-soft);color:var(--text);overflow-y:auto}
 .auth-card{width:min(650px,100%);color:var(--text)}
 .auth-card-login,.auth-card-forgot,.auth-card-reset{width:min(410px,100%)}
 .auth-welcome h2{color:var(--text)}
@@ -2418,8 +2418,12 @@ html[data-theme="dark"] .insights-tab-pill.is-active {
 .settings-signout{margin-top:18px}
 .profile-form>.primary-button{margin-top:5px}
 @media(max-width:760px){
+  .auth-page{grid-template-columns:1fr}
+  .auth-left{min-height:auto;max-height:220px;padding:25px 26px 24px}
+  .auth-left:before{top:-196px;right:-83px;width:360px}
+  .auth-left>.brand{font-size:23px}
+  .auth-right{align-items:flex-start;padding:25px 20px 34px;overflow-y:visible}
   .auth-card{width:min(600px,100%)}
-  .auth-right{align-items:flex-start;padding:25px 20px 34px}
   .auth-mini{padding-bottom:23px}
   .auth-welcome h2{font-size:34px}
   .mobile-nav{grid-template-columns:repeat(6,minmax(0,1fr))}
