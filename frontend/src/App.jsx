@@ -4,8 +4,8 @@ import {
   IonSelectOption, IonSpinner, IonToast, setupIonicReact,
 } from '@ionic/react';
 import {
-  addOutline, arrowDownOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
-  checkmarkCircleOutline, checkmarkOutline, chevronDownOutline, chevronForwardOutline,
+  addOutline, arrowUpOutline, bulbOutline, calendarClearOutline,
+  checkmarkCircleOutline, chevronDownOutline, chevronForwardOutline,
   closeOutline, createOutline, ellipsisHorizontal, flashOutline, gridOutline,
   helpCircleOutline, homeOutline, leafOutline, logOutOutline, logoGithub, logoGoogle,
   menuOutline, moonOutline, notificationsOutline, playOutline, pulseOutline,
