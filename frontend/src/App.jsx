@@ -33,7 +33,7 @@ function Logo({ small = false }) {
   return (
     <div className={`brand${small ? ' brand-small' : ''}`}>
       <img className="brand-image" src="/energeia-logo.png" alt="" aria-hidden="true" />
-      <span>EcoSync<span className="brand-dot">.</span></span>
+      <span>energeia<span className="brand-dot">.</span></span>
     </div>
   );
 }
@@ -1150,13 +1150,13 @@ function App() {
             <div className="sidebar-cta-card">
               <div className="cta-head">
                 <IonIcon icon={leafOutline} />
-                <span className="cta-brand">EcoSync Pro</span>
+                <span className="cta-brand">Energeia Pro</span>
               </div>
               <p>Upgrade for smarter AI automation</p>
               <button
                 type="button"
                 className="sidebar-cta-btn"
-                onClick={() => setNotice('EcoSync Pro: Smart load balancing and tariff optimization active.')}
+                onClick={() => setNotice('Energeia Pro: Smart load balancing and tariff optimization active.')}
               >
                 Get Pro
               </button>
@@ -1272,7 +1272,7 @@ function App() {
                   title={user?.full_name || user?.email}
                 >
                   <div className="profile-text">
-                    <strong className="profile-name">{user?.full_name || 'Julian Rivera'}</strong>
+                    <strong className="profile-name">{user?.full_name || user?.email || 'Home Owner'}</strong>
                     <span className="profile-role">Home Owner</span>
                   </div>
                   <button
@@ -1327,13 +1327,13 @@ function App() {
                     <div className="mobile-user-greeting">
                       <div className="greeting-avatar">{signedInInitial}</div>
                       <div className="greeting-text">
-                        <h2>Good Morning, {user?.first_name || (user?.full_name ? user.full_name.split(' ')[0] : 'John')}</h2>
+                        <h2>Good Morning, {user?.first_name || (user?.full_name ? user.full_name.split(' ')[0] : 'there')}</h2>
                         <p>Here's your energy overview</p>
                       </div>
                       <button
                         className="icon-button mobile-bell-btn"
                         aria-label="Notifications"
-                        onClick={() => setNotice('System operational: Solar yield at peak.')}
+                        onClick={() => setNotice('System operational: Energeia monitoring active.')}
                       >
                         <IonIcon icon={notificationsOutline} />
                         <span className="notification-indicator-dot" />
@@ -1355,17 +1355,19 @@ function App() {
                         />
                         <div className="gauge-stats-row">
                           <div className="gauge-stat-box">
-                            <span className="stat-label">Cost today</span>
+                            <span className="stat-label">Estimated cost</span>
                             <strong className="stat-number">
-                              {hasUsage && Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : '$1.35'}
+                              {hasUsage && Number(selectedRate?.rate_per_kwh) > 0 ? fmtMoney(dashboard?.estimated_cost) : '—'}
                             </strong>
-                            <span className="stat-badge-positive">+12% vs yesterday</span>
+                            <span className="stat-badge-positive">
+                              {selectedRate?.provider_name ? selectedRate.provider_name : 'Active rate'}
+                            </span>
                           </div>
                           <div className="gauge-stat-divider" />
                           <div className="gauge-stat-box">
-                            <span className="stat-label">Solar Yield</span>
-                            <strong className="stat-number">18.7 kWh</strong>
-                            <span className="stat-subtext">84% of forecast</span>
+                            <span className="stat-label">Active Devices</span>
+                            <strong className="stat-number">{appliances.length || '0'}</strong>
+                            <span className="stat-subtext">Connected</span>
                           </div>
                         </div>
                       </div>
@@ -1376,7 +1378,11 @@ function App() {
                         </div>
                         <div className="insight-banner-body">
                           <strong className="insight-heading">Insight</strong>
-                          <p>Your AC is consuming 40% of total energy today.</p>
+                          <p>
+                            {recommendations.length > 0
+                              ? recommendations[0].message
+                              : 'Set schedules for high-draw appliances to lower monthly billing.'}
+                          </p>
                           <span className="insight-cta">
                             View suggestions <IonIcon icon={chevronForwardOutline} />
                           </span>
@@ -1391,43 +1397,90 @@ function App() {
                           </button>
                         </div>
                         <div className="quick-control-cards-row">
-                          <div className={`quick-control-card${mobileQuickToggles.ac ? ' is-active' : ''}`}>
-                            <div className="quick-card-head">
-                              <span className="quick-icon-amber">
-                                <IonIcon icon={waterOutline} />
-                              </span>
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={mobileQuickToggles.ac}
-                                aria-label="Toggle Air Conditioner"
-                                className={`spring-switch${mobileQuickToggles.ac ? ' is-on' : ''}`}
-                                onClick={() => setMobileQuickToggles((p) => ({ ...p, ac: !p.ac }))}
-                              >
-                                <span className="switch-thumb" />
-                              </button>
-                            </div>
-                            <strong>Air Conditional</strong>
-                          </div>
+                          {appliances.length > 0 ? (
+                            appliances.slice(0, 2).map((app, idx) => {
+                              const appSchedules = schedules[app.appliance_id] || [];
+                              const primarySchedule = appSchedules[0];
+                              const isActive = primarySchedule ? primarySchedule.is_active : !mobileQuickToggles[`dev_${app.appliance_id}`];
+                              return (
+                                <div className={`quick-control-card${isActive ? ' is-active' : ''}`} key={app.appliance_id}>
+                                  <div className="quick-card-head">
+                                    <span className={idx === 0 ? 'quick-icon-amber' : 'quick-icon-pink'}>
+                                      <IonIcon
+                                        icon={
+                                          app.category === 'Cooling'
+                                            ? waterOutline
+                                            : app.category === 'Lighting'
+                                            ? bulbOutline
+                                            : flashOutline
+                                        }
+                                      />
+                                    </span>
+                                    <button
+                                      type="button"
+                                      role="switch"
+                                      aria-checked={isActive}
+                                      aria-label={`Toggle ${app.appliance_name}`}
+                                      className={`spring-switch${isActive ? ' is-on' : ''}`}
+                                      onClick={() => {
+                                        if (primarySchedule) {
+                                          setScheduleActive(primarySchedule, !primarySchedule.is_active);
+                                        } else {
+                                          setMobileQuickToggles((p) => ({
+                                            ...p,
+                                            [`dev_${app.appliance_id}`]: !p[`dev_${app.appliance_id}`],
+                                          }));
+                                        }
+                                      }}
+                                    >
+                                      <span className="switch-thumb" />
+                                    </button>
+                                  </div>
+                                  <strong>{app.appliance_name}</strong>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <>
+                              <div className={`quick-control-card${mobileQuickToggles.ac ? ' is-active' : ''}`}>
+                                <div className="quick-card-head">
+                                  <span className="quick-icon-amber">
+                                    <IonIcon icon={waterOutline} />
+                                  </span>
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={mobileQuickToggles.ac}
+                                    aria-label="Toggle Air Conditioner"
+                                    className={`spring-switch${mobileQuickToggles.ac ? ' is-on' : ''}`}
+                                    onClick={() => setMobileQuickToggles((p) => ({ ...p, ac: !p.ac }))}
+                                  >
+                                    <span className="switch-thumb" />
+                                  </button>
+                                </div>
+                                <strong>Air Conditioner</strong>
+                              </div>
 
-                          <div className={`quick-control-card${mobileQuickToggles.fridge ? ' is-active' : ''}`}>
-                            <div className="quick-card-head">
-                              <span className="quick-icon-pink">
-                                <IonIcon icon={flashOutline} />
-                              </span>
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={mobileQuickToggles.fridge}
-                                aria-label="Toggle Refrigerator"
-                                className={`spring-switch${mobileQuickToggles.fridge ? ' is-on' : ''}`}
-                                onClick={() => setMobileQuickToggles((p) => ({ ...p, fridge: !p.fridge }))}
-                              >
-                                <span className="switch-thumb" />
-                              </button>
-                            </div>
-                            <strong>Refrigerator</strong>
-                          </div>
+                              <div className={`quick-control-card${mobileQuickToggles.fridge ? ' is-active' : ''}`}>
+                                <div className="quick-card-head">
+                                  <span className="quick-icon-pink">
+                                    <IonIcon icon={flashOutline} />
+                                  </span>
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={mobileQuickToggles.fridge}
+                                    aria-label="Toggle Refrigerator"
+                                    className={`spring-switch${mobileQuickToggles.fridge ? ' is-on' : ''}`}
+                                    onClick={() => setMobileQuickToggles((p) => ({ ...p, fridge: !p.fridge }))}
+                                  >
+                                    <span className="switch-thumb" />
+                                  </button>
+                                </div>
+                                <strong>Refrigerator</strong>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1535,85 +1588,136 @@ function App() {
                           </button>
                         </div>
                         <div className="smart-devices-grid-2x2">
-                          <div className="smart-device-row">
-                            <span className="device-avatar-icon bg-blue">
-                              <IonIcon icon={waterOutline} />
-                            </span>
-                            <div className="device-meta-copy">
-                              <strong>HVAC System</strong>
-                              <span>Heating • Active</span>
-                            </div>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={smartDeviceToggles.hvac}
-                              aria-label="Toggle HVAC System"
-                              className={`spring-switch${smartDeviceToggles.hvac ? ' is-on' : ''}`}
-                              onClick={() => setSmartDeviceToggles((p) => ({ ...p, hvac: !p.hvac }))}
-                            >
-                              <span className="switch-thumb" />
-                            </button>
-                          </div>
+                          {appliances.length > 0 ? (
+                            appliances.slice(0, 4).map((app, idx) => {
+                              const appSchedules = schedules[app.appliance_id] || [];
+                              const primarySchedule = appSchedules[0];
+                              const isActive = primarySchedule ? primarySchedule.is_active : !smartDeviceToggles[`dev_${app.appliance_id}`];
+                              const colorClass = ['bg-blue', 'bg-pink', 'bg-amber', 'bg-slate'][idx % 4];
+                              return (
+                                <div className="smart-device-row" key={app.appliance_id}>
+                                  <span className={`device-avatar-icon ${colorClass}`}>
+                                    <IonIcon
+                                      icon={
+                                        app.category === 'Cooling'
+                                          ? waterOutline
+                                          : app.category === 'Lighting'
+                                          ? bulbOutline
+                                          : app.category === 'Kitchen'
+                                          ? flashOutline
+                                          : pulseOutline
+                                      }
+                                    />
+                                  </span>
+                                  <div className="device-meta-copy">
+                                    <strong>{app.appliance_name}</strong>
+                                    <span>{app.category || 'Appliance'} • {app.wattage}W</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={isActive}
+                                    aria-label={`Toggle ${app.appliance_name}`}
+                                    className={`spring-switch${isActive ? ' is-on' : ''}`}
+                                    onClick={() => {
+                                      if (primarySchedule) {
+                                        setScheduleActive(primarySchedule, !primarySchedule.is_active);
+                                      } else {
+                                        setSmartDeviceToggles((p) => ({
+                                          ...p,
+                                          [`dev_${app.appliance_id}`]: !p[`dev_${app.appliance_id}`],
+                                        }));
+                                      }
+                                    }}
+                                  >
+                                    <span className="switch-thumb" />
+                                  </button>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <>
+                              <div className="smart-device-row">
+                                <span className="device-avatar-icon bg-blue">
+                                  <IonIcon icon={waterOutline} />
+                                </span>
+                                <div className="device-meta-copy">
+                                  <strong>HVAC System</strong>
+                                  <span>Heating • Active</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={smartDeviceToggles.hvac}
+                                  aria-label="Toggle HVAC System"
+                                  className={`spring-switch${smartDeviceToggles.hvac ? ' is-on' : ''}`}
+                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, hvac: !p.hvac }))}
+                                >
+                                  <span className="switch-thumb" />
+                                </button>
+                              </div>
 
-                          <div className="smart-device-row">
-                            <span className="device-avatar-icon bg-pink">
-                              <IonIcon icon={flashOutline} />
-                            </span>
-                            <div className="device-meta-copy">
-                              <strong>Smart Fridge</strong>
-                              <span>Eco Mode • Active</span>
-                            </div>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={smartDeviceToggles.fridge}
-                              aria-label="Toggle Smart Fridge"
-                              className={`spring-switch${smartDeviceToggles.fridge ? ' is-on' : ''}`}
-                              onClick={() => setSmartDeviceToggles((p) => ({ ...p, fridge: !p.fridge }))}
-                            >
-                              <span className="switch-thumb" />
-                            </button>
-                          </div>
+                              <div className="smart-device-row">
+                                <span className="device-avatar-icon bg-pink">
+                                  <IonIcon icon={flashOutline} />
+                                </span>
+                                <div className="device-meta-copy">
+                                  <strong>Smart Fridge</strong>
+                                  <span>Eco Mode • Active</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={smartDeviceToggles.fridge}
+                                  aria-label="Toggle Smart Fridge"
+                                  className={`spring-switch${smartDeviceToggles.fridge ? ' is-on' : ''}`}
+                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, fridge: !p.fridge }))}
+                                >
+                                  <span className="switch-thumb" />
+                                </button>
+                              </div>
 
-                          <div className="smart-device-row">
-                            <span className="device-avatar-icon bg-amber">
-                              <IonIcon icon={bulbOutline} />
-                            </span>
-                            <div className="device-meta-copy">
-                              <strong>Smart Lighting</strong>
-                              <span>Eco Mode • Active</span>
-                            </div>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={smartDeviceToggles.washer}
-                              aria-label="Toggle Smart Lighting"
-                              className={`spring-switch${smartDeviceToggles.washer ? ' is-on' : ''}`}
-                              onClick={() => setSmartDeviceToggles((p) => ({ ...p, washer: !p.washer }))}
-                            >
-                              <span className="switch-thumb" />
-                            </button>
-                          </div>
+                              <div className="smart-device-row">
+                                <span className="device-avatar-icon bg-amber">
+                                  <IonIcon icon={bulbOutline} />
+                                </span>
+                                <div className="device-meta-copy">
+                                  <strong>Smart Lighting</strong>
+                                  <span>Eco Mode • Active</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={smartDeviceToggles.washer}
+                                  aria-label="Toggle Smart Lighting"
+                                  className={`spring-switch${smartDeviceToggles.washer ? ' is-on' : ''}`}
+                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, washer: !p.washer }))}
+                                >
+                                  <span className="switch-thumb" />
+                                </button>
+                              </div>
 
-                          <div className="smart-device-row">
-                            <span className="device-avatar-icon bg-slate">
-                              <IonIcon icon={pulseOutline} />
-                            </span>
-                            <div className="device-meta-copy">
-                              <strong>EV Charger</strong>
-                              <span>Disconnected</span>
-                            </div>
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={smartDeviceToggles.charger}
-                              aria-label="Toggle EV Charger"
-                              className={`spring-switch${smartDeviceToggles.charger ? ' is-on' : ''}`}
-                              onClick={() => setSmartDeviceToggles((p) => ({ ...p, charger: !p.charger }))}
-                            >
-                              <span className="switch-thumb" />
-                            </button>
-                          </div>
+                              <div className="smart-device-row">
+                                <span className="device-avatar-icon bg-slate">
+                                  <IonIcon icon={pulseOutline} />
+                                </span>
+                                <div className="device-meta-copy">
+                                  <strong>EV Charger</strong>
+                                  <span>Disconnected</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  role="switch"
+                                  aria-checked={smartDeviceToggles.charger}
+                                  aria-label="Toggle EV Charger"
+                                  className={`spring-switch${smartDeviceToggles.charger ? ' is-on' : ''}`}
+                                  onClick={() => setSmartDeviceToggles((p) => ({ ...p, charger: !p.charger }))}
+                                >
+                                  <span className="switch-thumb" />
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </article>
 
