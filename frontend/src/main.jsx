@@ -9,6 +9,7 @@ import '@ionic/react/css/padding.css';
 import '@ionic/react/css/flex-utils.css';
 import './theme/variables.css';
 import './styles.css';
+import './repairs.css';
 
 const root = createRoot(document.getElementById('root'));
 root.render(
