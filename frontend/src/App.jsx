@@ -1,4 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { SocialLogin } from '@capgo/capacitor-social-login';
 import {
   IonApp, IonButton, IonContent, IonIcon, IonInput, IonModal, IonPage, IonSelect,
   IonSelectOption, IonSpinner, IonToast, setupIonicReact,
@@ -28,6 +31,48 @@ const CATEGORIES = ['Cooling', 'Kitchen', 'Laundry', 'Lighting', 'Electronics', 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const PERIOD = new Date().toISOString().slice(0, 7);
 const PERIOD_LABEL = new Date().toLocaleString('en', { month: 'long', year: 'numeric' });
+const OAUTH_ERRORS = {
+  account_exists: 'An account with this email already exists. Sign in with that account, then connect this provider in Account settings.',
+  provider_already_linked: 'This provider is already connected to another Energeia account.',
+  account_conflict: 'That provider sign-in is already in use. Sign in to the existing account or contact support.',
+  sign_in_cancelled: 'Sign-in was cancelled.',
+  expired_state: 'The sign-in request expired. Please try again.',
+  invalid_state: 'The sign-in response could not be verified. Please try again.',
+  provider_failure: 'The provider could not complete sign-in. Check your verified provider email and try again.',
+};
+
+let googleLoginInitialization;
+
+async function nativeGoogleSignIn({ linking = false } = {}) {
+  const endpoint = linking ? '/auth/providers/google/native' : '/auth/oauth/google/native';
+  const { web_client_id: webClientId, nonce } = await request(`${endpoint}/start`, { method: 'POST' });
+  if (!googleLoginInitialization) {
+    googleLoginInitialization = SocialLogin.initialize({
+      google: { webClientId, mode: 'online' },
+    }).catch((exception) => {
+      googleLoginInitialization = undefined;
+      throw exception;
+    });
+  }
+  await googleLoginInitialization;
+  const response = await SocialLogin.login({
+    provider: 'google',
+    options: {
+      scopes: ['profile', 'email'],
+      nonce,
+      style: 'bottom',
+      autoSelectEnabled: false,
+      filterByAuthorizedAccounts: false,
+    },
+  });
+  if (response.responseType !== 'online' || !response.idToken) {
+    throw new Error('Google did not return a sign-in token. Please try again.');
+  }
+  return request(`${endpoint}/complete`, {
+    method: 'POST',
+    body: { id_token: response.idToken, nonce },
+  });
+}
 
 function Logo({ small = false }) {
   return (
@@ -330,7 +375,14 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken }
     setLoading(true);
     setError('');
     try {
-      const result = await request(`/auth/oauth/${provider}/start`, { method: 'POST' });
+      if (provider === 'google' && Capacitor.getPlatform() === 'android') {
+        const result = await nativeGoogleSignIn();
+        localStorage.setItem('energeia_token', result.access_token);
+        onLogin(result.user);
+        return;
+      }
+      const nativeQuery = Capacitor.isNativePlatform() ? '?native_app=true' : '';
+      const result = await request(`/auth/oauth/${provider}/start${nativeQuery}`, { method: 'POST' });
       window.location.assign(result.authorization_url);
     } catch (exception) {
       setError(exception.message);
@@ -634,6 +686,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [connectedProviders, setConnectedProviders] = useState([]);
+  const handledOAuthUrls = useRef(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState('24h');
   const [deviceFilter, setDeviceFilter] = useState('all');
@@ -696,6 +749,39 @@ function App() {
     setDashboard(null);
   }, []);
 
+  const handleOAuthReturn = useCallback(async (url) => {
+    if (handledOAuthUrls.current.has(url)) return;
+    handledOAuthUrls.current.add(url);
+
+    let callback;
+    try {
+      callback = new URL(url);
+    } catch {
+      return;
+    }
+    if (callback.protocol !== 'io.ionic.starter:' || callback.hostname !== 'oauth') return;
+
+    const params = new URLSearchParams(callback.hash.slice(1));
+    const token = params.get('access_token');
+    const oauthError = params.get('oauth_error');
+    if (oauthError) {
+      setOauthError(OAUTH_ERRORS[oauthError] || 'Sign-in could not be completed. Please try again.');
+    }
+    if (!token) return;
+
+    localStorage.setItem('energeia_token', token);
+    setOauthError('');
+    setLoading(true);
+    try {
+      setUser(await request('/auth/me'));
+    } catch (exception) {
+      handleLogout();
+      setOauthError(exception.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [handleLogout]);
+
   useEffect(() => {
     const callback = new URLSearchParams(window.location.hash.slice(1));
     const callbackToken = callback.get('access_token');
@@ -704,16 +790,7 @@ function App() {
     if (callbackToken) localStorage.setItem('energeia_token', callbackToken);
     if (callbackResetToken) setResetToken(callbackResetToken);
     if (callbackError) {
-      const messages = {
-        account_exists: 'An account with this email already exists. Sign in with that account, then connect this provider in Account settings.',
-        provider_already_linked: 'This provider is already connected to another Energeia account.',
-        account_conflict: 'That provider sign-in is already in use. Sign in to the existing account or contact support.',
-        sign_in_cancelled: 'Sign-in was cancelled.',
-        expired_state: 'The sign-in request expired. Please try again.',
-        invalid_state: 'The sign-in response could not be verified. Please try again.',
-        provider_failure: 'The provider could not complete sign-in. Check your verified provider email and try again.',
-      };
-      setOauthError(messages[callbackError] || 'Sign-in could not be completed. Please try again.');
+      setOauthError(OAUTH_ERRORS[callbackError] || 'Sign-in could not be completed. Please try again.');
     }
     if (callbackToken || callbackResetToken || callbackError) {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
@@ -722,6 +799,27 @@ function App() {
     if (!token) { setLoading(false); return; }
     request('/auth/me').then(setUser).catch(handleLogout).finally(() => setLoading(false));
   }, [handleLogout]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+
+    let listener;
+    let active = true;
+    CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+      void handleOAuthReturn(url);
+    }).then((registeredListener) => {
+      if (active) listener = registeredListener;
+      else void registeredListener.remove();
+    });
+    void CapacitorApp.getLaunchUrl().then((launch) => {
+      if (launch?.url) void handleOAuthReturn(launch.url);
+    });
+
+    return () => {
+      active = false;
+      void listener?.remove();
+    };
+  }, [handleOAuthReturn]);
 
   const refresh = useCallback(async (id = householdId, { calculate = false } = {}) => {
     if (!id) return;
@@ -836,7 +934,13 @@ function App() {
   async function connectProvider(provider) {
     setError('');
     try {
-      const result = await request(`/auth/providers/${provider}/start`, { method: 'POST' });
+      if (provider === 'google' && Capacitor.getPlatform() === 'android') {
+        const result = await nativeGoogleSignIn({ linking: true });
+        setNotice(result.message);
+        return;
+      }
+      const nativeQuery = Capacitor.isNativePlatform() ? '?native_app=true' : '';
+      const result = await request(`/auth/providers/${provider}/start${nativeQuery}`, { method: 'POST' });
       window.location.assign(result.authorization_url);
     } catch (exception) {
       setError(exception.message);

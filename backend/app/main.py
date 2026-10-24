@@ -1,26 +1,30 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import secrets
+import smtplib
+import ssl
 from calendar import monthrange
 from collections import defaultdict
 from collections.abc import Generator
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from email.message import EmailMessage
-import hashlib
-import json
-import secrets
-import smtplib
-import ssl
 from typing import Annotated
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request as UrlRequest, urlopen
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
 import jwt
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from google.auth.exceptions import GoogleAuthError
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2 import id_token as google_id_token
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pydantic import (
@@ -154,6 +158,16 @@ class PasswordResetToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
+
+
+class OAuthIdentityError(Exception):
+    def __init__(self, error_code: str):
+        self.error_code = error_code
+
+
+class NativeGoogleSignInInput(BaseModel):
+    id_token: str = Field(min_length=1, max_length=8192)
+    nonce: str = Field(min_length=1, max_length=128)
 
 
 class ElectricityRate(Base):
@@ -666,7 +680,12 @@ def oauth_credentials(provider: str) -> tuple[str, str]:
     return credentials
 
 
-def start_oauth(provider: str, db: Session, user_id: int | None = None) -> dict[str, str]:
+def start_oauth(
+    provider: str,
+    db: Session,
+    user_id: int | None = None,
+    native_app: bool = False,
+) -> dict[str, str]:
     client_id, _ = oauth_credentials(provider)
     state_id = secrets.token_urlsafe(32)
     expires_at = utc_now() + timedelta(minutes=10)
@@ -684,6 +703,7 @@ def start_oauth(provider: str, db: Session, user_id: int | None = None) -> dict[
             "typ": "oauth_state",
             "provider": provider,
             "jti": state_id,
+            "native_app": native_app,
             "exp": expires_at.replace(tzinfo=UTC),
         },
         settings.jwt_secret,
@@ -819,14 +839,203 @@ def fetch_oauth_identity(
     )
 
 
-def oauth_redirect(*, token: str | None = None, profile_complete: bool = False, error: str | None = None):
+def start_native_google(db: Session, user_id: int | None = None) -> dict[str, str]:
+    if not settings.google_client_id:
+        raise HTTPException(
+            status_code=503,
+            detail="Google sign-in is not configured on the Energeia API.",
+        )
+    nonce = secrets.token_urlsafe(32)
+    db.add(
+        OAuthState(
+            state_id=nonce,
+            provider="google",
+            user_id=user_id,
+            expires_at=utc_now() + timedelta(minutes=10),
+        )
+    )
+    db.commit()
+    return {"web_client_id": settings.google_client_id, "nonce": nonce}
+
+
+def fetch_native_google_identity(id_token: str, nonce: str) -> tuple[str, str, str | None, str | None, str | None]:
+    try:
+        claims = google_id_token.verify_oauth2_token(
+            id_token,
+            GoogleAuthRequest(),
+            audience=settings.google_client_id,
+        )
+    except ValueError as exception:
+        raise HTTPException(status_code=401, detail="Google sign-in could not be verified.") from exception
+    except GoogleAuthError as exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Google sign-in could not be reached. Please try again.",
+        ) from exception
+
+    if claims.get("nonce") != nonce:
+        raise HTTPException(status_code=401, detail="Google sign-in could not be verified.")
+    subject = claims.get("sub")
+    email = claims.get("email")
+    if (
+        not isinstance(subject, str)
+        or not subject
+        or not isinstance(email, str)
+        or not email
+        or claims.get("email_verified") is not True
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Google did not return a verified email address.",
+        )
+    try:
+        email = str(TypeAdapter(EmailStr).validate_python(email)).lower()
+    except ValueError as exception:
+        raise HTTPException(status_code=401, detail="Google returned an invalid email address.") from exception
+    if len(email) > 150 or len(subject) > 255:
+        raise HTTPException(status_code=401, detail="Google returned invalid account details.")
+
+    first_name = claims.get("given_name")
+    last_name = claims.get("family_name")
+    first_name = first_name.strip()[:100] if isinstance(first_name, str) and first_name.strip() else None
+    last_name = last_name.strip()[:100] if isinstance(last_name, str) and last_name.strip() else None
+    full_name = " ".join(part for part in (first_name, last_name) if part) or None
+    return subject, email, full_name[:150] if full_name else None, first_name, last_name
+
+
+def complete_oauth_identity(
+    db: Session,
+    provider: str,
+    subject: str,
+    email: str,
+    full_name: str | None,
+    first_name: str | None,
+    last_name: str | None,
+    user_id: int | None = None,
+) -> User:
+    identity = db.scalar(
+        select(OAuthIdentity).where(
+            OAuthIdentity.provider == provider,
+            OAuthIdentity.subject == subject,
+        )
+    )
+    if user_id is not None:
+        user = db.get(User, user_id)
+        if user is None:
+            raise OAuthIdentityError("account_unavailable")
+        if identity and identity.user_id != user.user_id:
+            raise OAuthIdentityError("provider_already_linked")
+        if identity is None:
+            db.add(
+                OAuthIdentity(
+                    user_id=user.user_id,
+                    provider=provider,
+                    subject=subject,
+                    provider_email=email,
+                )
+            )
+    elif identity is not None:
+        user = db.get(User, identity.user_id)
+        if user is None:
+            raise OAuthIdentityError("account_unavailable")
+    else:
+        if db.scalar(select(User).where(User.email == email)):
+            raise OAuthIdentityError("account_exists")
+        user = User(
+            email=email,
+            full_name=full_name,
+            first_name=first_name,
+            last_name=last_name,
+            password_hash=None,
+        )
+        db.add(user)
+        db.flush()
+        db.add(
+            OAuthIdentity(
+                user_id=user.user_id,
+                provider=provider,
+                subject=subject,
+                provider_email=email,
+            )
+        )
+    try:
+        db.commit()
+    except IntegrityError as exception:
+        db.rollback()
+        raise OAuthIdentityError("account_conflict") from exception
+    db.refresh(user)
+    return user
+
+
+def complete_native_google(
+    body: NativeGoogleSignInInput,
+    db: Session,
+    user: User | None = None,
+) -> dict:
+    state = db.get(OAuthState, body.nonce)
+    if (
+        state is None
+        or state.provider != "google"
+        or state.consumed_at is not None
+        or state.expires_at <= utc_now()
+        or (user is None and state.user_id is not None)
+        or (user is not None and state.user_id != user.user_id)
+    ):
+        raise HTTPException(status_code=400, detail="The Google sign-in request expired. Please try again.")
+    state.consumed_at = utc_now()
+    db.commit()
+
+    subject, email, full_name, first_name, last_name = fetch_native_google_identity(
+        body.id_token,
+        body.nonce,
+    )
+    try:
+        user = complete_oauth_identity(
+            db,
+            "google",
+            subject,
+            email,
+            full_name,
+            first_name,
+            last_name,
+            state.user_id,
+        )
+    except OAuthIdentityError as exception:
+        messages = {
+            "account_exists": (
+                "An account with this email already exists. Sign in with that account, "
+                "then connect Google in Account settings."
+            ),
+            "provider_already_linked": "This Google account is already connected to another Energeia account.",
+            "account_unavailable": "The Energeia account could not be found.",
+            "account_conflict": "This Google account is already in use by another Energeia account.",
+        }
+        raise HTTPException(status_code=409, detail=messages[exception.error_code]) from exception
+
+    return {
+        "access_token": issue_token(user),
+        "user": serialize_user(user),
+    }
+
+
+def oauth_redirect(
+    *,
+    token: str | None = None,
+    profile_complete: bool = False,
+    error: str | None = None,
+    native_app: bool = False,
+):
     fragment = {}
     if token:
         fragment["access_token"] = token
         fragment["profile_complete"] = "true" if profile_complete else "false"
     if error:
         fragment["oauth_error"] = error
-    destination = f"{settings.frontend_url.rstrip('/')}/#{urlencode(fragment)}"
+    destination = (
+        f"io.ionic.starter://oauth#{urlencode(fragment)}"
+        if native_app
+        else f"{settings.frontend_url.rstrip('/')}/#{urlencode(fragment)}"
+    )
     return RedirectResponse(destination, status_code=303)
 
 
@@ -1331,13 +1540,43 @@ def connected_providers(db: Db, user: CurrentUser) -> dict[str, object]:
 
 
 @router.post("/auth/oauth/{provider}/start")
-def oauth_start(provider: str, db: Db) -> dict[str, str]:
-    return start_oauth(provider, db)
+def oauth_start(provider: str, db: Db, native_app: bool = False) -> dict[str, str]:
+    return start_oauth(provider, db, native_app=native_app)
+
+
+@router.post("/auth/oauth/google/native/start")
+def native_google_start(db: Db) -> dict[str, str]:
+    return start_native_google(db)
+
+
+@router.post("/auth/oauth/google/native/complete")
+def native_google_complete(body: NativeGoogleSignInInput, db: Db) -> dict:
+    return complete_native_google(body, db)
 
 
 @router.post("/auth/providers/{provider}/start")
-def oauth_link_start(provider: str, db: Db, user: CurrentUser) -> dict[str, str]:
-    return start_oauth(provider, db, user.user_id)
+def oauth_link_start(
+    provider: str,
+    db: Db,
+    user: CurrentUser,
+    native_app: bool = False,
+) -> dict[str, str]:
+    return start_oauth(provider, db, user.user_id, native_app=native_app)
+
+
+@router.post("/auth/providers/google/native/start")
+def native_google_link_start(db: Db, user: CurrentUser) -> dict[str, str]:
+    return start_native_google(db, user.user_id)
+
+
+@router.post("/auth/providers/google/native/complete")
+def native_google_link_complete(
+    body: NativeGoogleSignInInput,
+    db: Db,
+    user: CurrentUser,
+) -> dict[str, str]:
+    complete_native_google(body, db, user=user)
+    return {"message": "Google account connected."}
 
 
 @router.get("/auth/oauth/{provider}/callback", name="oauth_callback")
@@ -1351,7 +1590,18 @@ def oauth_callback(
     if provider not in {"google", "github"}:
         return oauth_redirect(error="unsupported_provider")
     if error:
-        return oauth_redirect(error="sign_in_cancelled")
+        native_app = False
+        if state:
+            try:
+                claims = jwt.decode(state, settings.jwt_secret, algorithms=["HS256"])
+                native_app = (
+                    claims.get("typ") == "oauth_state"
+                    and claims.get("provider") == provider
+                    and claims.get("native_app") is True
+                )
+            except InvalidTokenError:
+                pass
+        return oauth_redirect(error="sign_in_cancelled", native_app=native_app)
     if not code or not state:
         return oauth_redirect(error="invalid_callback")
     try:
@@ -1360,6 +1610,11 @@ def oauth_callback(
             raise InvalidTokenError("Invalid OAuth state")
     except InvalidTokenError:
         return oauth_redirect(error="invalid_state")
+    native_app = claims.get("native_app") is True
+
+    def redirect(**kwargs):
+        return oauth_redirect(native_app=native_app, **kwargs)
+
     state_record = db.get(OAuthState, claims.get("jti"))
     if (
         state_record is None
@@ -1367,7 +1622,7 @@ def oauth_callback(
         or state_record.consumed_at is not None
         or state_record.expires_at <= utc_now()
     ):
-        return oauth_redirect(error="expired_state")
+        return redirect(error="expired_state")
     state_record.consumed_at = utc_now()
     db.commit()
 
@@ -1377,60 +1632,22 @@ def oauth_callback(
         if len(email) > 150 or not subject or len(subject) > 255:
             raise ValueError("The provider account details are not valid.")
     except (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, json.JSONDecodeError):
-        return oauth_redirect(error="provider_failure")
+        return redirect(error="provider_failure")
 
-    identity = db.scalar(
-        select(OAuthIdentity).where(
-            OAuthIdentity.provider == provider,
-            OAuthIdentity.subject == subject,
-        )
-    )
-    if state_record.user_id is not None:
-        user = db.get(User, state_record.user_id)
-        if user is None:
-            return oauth_redirect(error="account_unavailable")
-        if identity and identity.user_id != user.user_id:
-            return oauth_redirect(error="provider_already_linked")
-        if identity is None:
-            db.add(
-                OAuthIdentity(
-                    user_id=user.user_id,
-                    provider=provider,
-                    subject=subject,
-                    provider_email=email,
-                )
-            )
-    elif identity is not None:
-        user = db.get(User, identity.user_id)
-        if user is None:
-            return oauth_redirect(error="account_unavailable")
-    else:
-        if db.scalar(select(User).where(User.email == email)):
-            return oauth_redirect(error="account_exists")
-        user = User(
-            email=email,
-            full_name=full_name,
-            first_name=first_name,
-            last_name=last_name,
-            password_hash=None,
-        )
-        db.add(user)
-        db.flush()
-        db.add(
-            OAuthIdentity(
-                user_id=user.user_id,
-                provider=provider,
-                subject=subject,
-                provider_email=email,
-            )
-        )
     try:
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        return oauth_redirect(error="account_conflict")
-    db.refresh(user)
-    return oauth_redirect(
+        user = complete_oauth_identity(
+            db,
+            provider,
+            subject,
+            email,
+            full_name,
+            first_name,
+            last_name,
+            state_record.user_id,
+        )
+    except OAuthIdentityError as exception:
+        return redirect(error=exception.error_code)
+    return redirect(
         token=issue_token(user),
         profile_complete=profile_is_complete(user),
     )

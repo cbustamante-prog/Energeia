@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
@@ -19,11 +21,12 @@ from app.main import (
     PasswordResetToken,
     User,
     app,
+    fetch_native_google_identity,
     get_db,
+    google_id_token,
     settings,
     utc_today,
 )
-from urllib.parse import parse_qs, urlsplit
 
 
 @pytest.fixture()
@@ -205,6 +208,142 @@ def test_oauth_uses_backend_callback_and_does_not_merge_by_email(client, monkeyp
     with sessions() as db:
         assert db.query(OAuthIdentity).count() == 0
         assert db.query(OAuthState).one().consumed_at is not None
+
+
+def test_native_oauth_returns_to_installed_app(client, monkeypatch):
+    test_client, _ = client
+    monkeypatch.setattr(settings, "google_client_id", "google-client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "google-client-secret")
+    monkeypatch.setattr(settings, "api_public_url", "https://api.example.test")
+    monkeypatch.setattr(
+        "app.main.fetch_oauth_identity",
+        lambda provider, code: (
+            "native-google-subject",
+            "native@example.com",
+            "Native User",
+            "Native",
+            "User",
+        ),
+    )
+
+    start = test_client.post("/api/auth/oauth/google/start?native_app=true")
+    assert start.status_code == 200, start.text
+    state = parse_qs(urlsplit(start.json()["authorization_url"]).query)["state"][0]
+    callback = test_client.get(
+        "/api/auth/oauth/google/callback",
+        params={"code": "authorization-code", "state": state},
+        follow_redirects=False,
+    )
+
+    assert callback.status_code == 303
+    redirect = urlsplit(callback.headers["location"])
+    assert redirect.scheme == "io.ionic.starter"
+    assert redirect.netloc == "oauth"
+    fragment = parse_qs(redirect.fragment)
+    assert fragment["access_token"]
+    assert fragment["profile_complete"] == ["false"]
+
+
+def test_native_google_signin_uses_a_single_use_nonce(client, monkeypatch):
+    test_client, sessions = client
+    monkeypatch.setattr(settings, "google_client_id", "google-client-id")
+    monkeypatch.setattr(
+        "app.main.fetch_native_google_identity",
+        lambda token, nonce: (
+            "native-google-subject",
+            "native@example.com",
+            "Native User",
+            "Native",
+            "User",
+        ),
+    )
+
+    start = test_client.post("/api/auth/oauth/google/native/start")
+    assert start.status_code == 200, start.text
+    assert start.json()["web_client_id"] == "google-client-id"
+    nonce = start.json()["nonce"]
+    complete = test_client.post(
+        "/api/auth/oauth/google/native/complete",
+        json={"id_token": "signed-google-id-token", "nonce": nonce},
+    )
+    assert complete.status_code == 200, complete.text
+    assert complete.json()["user"]["email"] == "native@example.com"
+    assert complete.json()["access_token"]
+
+    replay = test_client.post(
+        "/api/auth/oauth/google/native/complete",
+        json={"id_token": "signed-google-id-token", "nonce": nonce},
+    )
+    assert replay.status_code == 400
+    with sessions() as db:
+        assert db.query(OAuthIdentity).one().subject == "native-google-subject"
+        assert db.query(OAuthState).one().consumed_at is not None
+
+
+def test_native_google_identity_verifies_nonce_and_email(monkeypatch):
+    monkeypatch.setattr(settings, "google_client_id", "google-client-id")
+    claims = {
+        "sub": "google-subject",
+        "email": "native@example.com",
+        "email_verified": True,
+        "nonce": "expected-nonce",
+        "given_name": "Native",
+        "family_name": "User",
+    }
+    monkeypatch.setattr(
+        google_id_token,
+        "verify_oauth2_token",
+        lambda token, request, audience: claims,
+    )
+
+    identity = fetch_native_google_identity("signed-google-id-token", "expected-nonce")
+    assert identity == (
+        "google-subject",
+        "native@example.com",
+        "Native User",
+        "Native",
+        "User",
+    )
+
+    with pytest.raises(HTTPException) as invalid_nonce:
+        fetch_native_google_identity("signed-google-id-token", "different-nonce")
+    assert invalid_nonce.value.status_code == 401
+
+    claims["email_verified"] = False
+    with pytest.raises(HTTPException) as unverified_email:
+        fetch_native_google_identity("signed-google-id-token", "expected-nonce")
+    assert unverified_email.value.status_code == 401
+
+
+def test_native_google_can_link_to_the_signed_in_account(client, monkeypatch):
+    test_client, sessions = client
+    token = create_account(test_client, "owner@example.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    monkeypatch.setattr(settings, "google_client_id", "google-client-id")
+    monkeypatch.setattr(settings, "google_client_secret", "")
+    monkeypatch.setattr(
+        "app.main.fetch_native_google_identity",
+        lambda id_token, nonce: (
+            "linked-google-subject",
+            "linked@example.com",
+            "Linked User",
+            "Linked",
+            "User",
+        ),
+    )
+
+    start = test_client.post("/api/auth/providers/google/native/start", headers=headers)
+    assert start.status_code == 200, start.text
+    complete = test_client.post(
+        "/api/auth/providers/google/native/complete",
+        headers=headers,
+        json={"id_token": "signed-google-id-token", "nonce": start.json()["nonce"]},
+    )
+    assert complete.status_code == 200, complete.text
+    assert complete.json()["message"] == "Google account connected."
+    with sessions() as db:
+        identity = db.query(OAuthIdentity).one()
+        assert identity.provider_email == "linked@example.com"
 
 
 def test_oauth_registration_profile_completion_and_secure_provider_linking(client, monkeypatch):

@@ -46,6 +46,8 @@ In production, replace `{API_PUBLIC_URL}` with the actual public FastAPI origin 
 4. Add the exact local and production API callback URLs above under **Authorized redirect URIs**.
 5. This server-side OAuth flow does not use a Google JavaScript SDK, so it does not require an authorized JavaScript origin. Do not enter the Vercel root as a redirect URI.
 6. Copy the client ID and secret into the FastAPI host's `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. Never put the secret in Vercel's `VITE_*` variables or frontend source.
+7. Create an additional OAuth client of type **Android** in the same Google Cloud project. Set its package name to `io.ionic.starter` and register the SHA-1 fingerprint for the APK's signing key. For the local debug APK, run `.\gradlew.bat signingReport` from `frontend\android` and use the debug variant's SHA-1. Register a separate Android client fingerprint for each release signing key you use.
+8. The Android app uses the **Web application** client ID for its native Google Credential Manager request; it is already configured as `GOOGLE_CLIENT_ID` on the API. The Android client is used by Google to validate the app package/signature. Never put `GOOGLE_CLIENT_SECRET` in the Android app.
 
 ### GitHub OAuth App
 
@@ -56,6 +58,10 @@ In production, replace `{API_PUBLIC_URL}` with the actual public FastAPI origin 
 5. Store the app's client ID and secret in the corresponding backend environment variables. GitHub sign-in requests `read:user` and `user:email`, then requires a verified primary email.
 
 The backend refuses to auto-link an OAuth identity to a password account based only on a matching email. Sign in to the existing Energia account first, then connect Google or GitHub from **Account settings**. Users can see connected providers there; this version does not offer provider disconnection or account deletion.
+
+On Android, Google sign-in uses the native Credential Manager account chooser instead of opening Chrome. The app sends Google's ID token and a short-lived, single-use nonce to the API; the API verifies the token's signature, issuer, audience, expiration, nonce, and verified email before issuing an Energeia session. This uses the existing Web application client ID and server-side Google credentials. Website Google sign-in and GitHub sign-in continue to use their existing browser OAuth flow. The existing `io.ionic.starter://oauth` deep link remains available for native browser OAuth callbacks, but is not used for Android Google sign-in.
+
+After adding the Android OAuth client or changing its signing fingerprint, rebuild and reinstall the APK. Google may take several hours to apply OAuth client changes. Deploy the updated API before using native Google sign-in; the API now depends on `google-auth` to validate native ID tokens.
 
 ## Password-reset email
 
