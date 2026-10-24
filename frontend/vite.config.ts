@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    include: ['src/**/*.test.{js,jsx,ts,tsx}'],
     environment: 'jsdom',
     environmentOptions: { jsdom: { url: 'http://localhost/' } },
     setupFiles: './src/setupTests.ts',

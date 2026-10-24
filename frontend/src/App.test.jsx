@@ -1,7 +1,12 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App.jsx';
+
+beforeEach(() => {
+  window.history.replaceState(null, '', '/login');
+  vi.stubGlobal('scrollTo', vi.fn());
+});
 
 afterEach(() => {
   cleanup();
@@ -11,7 +16,42 @@ afterEach(() => {
 });
 
 describe('Energeia', () => {
-  it('welcomes new visitors with the sign-in form', async () => {
+  it('introduces real features and links to registration from the landing page', async () => {
+    window.history.replaceState(null, '', '/');
+    render(<App />);
+    expect(await screen.findByRole('heading', { name: /Small habits/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Get started' }).getAttribute('href')).toBe('/register');
+    expect(screen.getByRole('link', { name: 'Sign in', exact: true }).getAttribute('href')).toBe('/login');
+  });
+
+  it('preserves the intended private route when redirecting to sign-in', async () => {
+    window.history.replaceState(null, '', '/scenarios');
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Welcome back' });
+    expect(window.location.pathname).toBe('/login');
+    expect(new URLSearchParams(window.location.search).get('next')).toBe('/scenarios');
+  });
+
+
+  it('waits for household loading before showing a failure state', async () => {
+    let finishHouseholds;
+    const pendingHouseholds = new Promise((resolve) => { finishHouseholds = resolve; });
+    localStorage.setItem('energeia_token', 'test-token');
+    vi.stubGlobal('fetch', vi.fn(async (url) => ({
+      ok: true, status: 200,
+      json: async () => url.endsWith('/auth/me')
+        ? { user_id: 1, profile_complete: true, full_name: 'Alex' }
+        : pendingHouseholds,
+    })));
+    const { container } = render(<App />);
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/households'), expect.any(Object)));
+    expect(container.querySelector('.app-loading')).toBeTruthy();
+    expect(screen.queryByText('Your household could not be loaded')).toBeNull();
+    finishHouseholds([]);
+    expect(await screen.findByRole('heading', { name: 'Set up your household' })).toBeTruthy();
+  });
+
+  it('loads the real sign-in route', async () => {
     const { container } = render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Welcome back' })).toBeTruthy();
@@ -124,5 +164,7 @@ describe('Energeia', () => {
       await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe(heading));
       expect(document.documentElement.dataset.theme).toBe('dark');
     }
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/auth/me'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/calculate'))).toHaveLength(1);
   });
 });
