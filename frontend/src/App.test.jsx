@@ -118,7 +118,12 @@ describe('Energeia', () => {
       '/auth/providers': { providers: [], password_enabled: true },
       '/households': [household],
       '/rates': [{ rate_id: 1, provider_name: 'Sample Utility', rate_per_kwh: 11.25 }],
-      '/households/1/appliances': [],
+      '/households/1/appliances': [
+        { appliance_id: 1, appliance_name: 'Desk fan', category: 'Electronics', wattage: 60, quantity: 1, average_hours_per_day: 2 },
+        { appliance_id: 2, appliance_name: 'Air conditioner', category: 'Cooling', wattage: 1200, quantity: 1, average_hours_per_day: 4 },
+      ],
+      '/appliances/1/schedules': [],
+      '/appliances/2/schedules': [],
       '/households/1/bills': [],
       '/households/1/recommendations': [],
       '/households/1/scenarios': [],
@@ -140,7 +145,7 @@ describe('Energeia', () => {
 
     await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe('Home'));
     await waitFor(() => expect(container.querySelector('.metric-card-primary strong')?.textContent).toContain('75.2'));
-    expect(container.querySelectorAll('.mobile-nav-item')).toHaveLength(6);
+    expect(document.body.querySelectorAll('.mobile-nav-item')).toHaveLength(6);
 
     const menuButton = container.querySelector('.menu-toggle');
     expect(menuButton?.getAttribute('aria-expanded')).toBe('false');
@@ -163,6 +168,15 @@ describe('Energeia', () => {
       fireEvent.click(screen.getByRole('button', { name: navLabel }));
       await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe(heading));
       expect(document.documentElement.dataset.theme).toBe('dark');
+      if (navLabel === 'Appliances') {
+        const names = () => [...container.querySelectorAll('.appliance-name h3')].map((item) => item.textContent);
+        expect(names()).toEqual(['Desk fan', 'Air conditioner']);
+        fireEvent.click(screen.getByRole('button', { name: /Wattage: high to low/ }));
+        expect(names()).toEqual(['Air conditioner', 'Desk fan']);
+        fireEvent.click(screen.getByRole('button', { name: /Wattage: high to low/ }));
+        await screen.findByRole('button', { name: /Wattage: low to high/ });
+        expect(names()).toEqual(['Desk fan', 'Air conditioner']);
+      }
     }
     expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/auth/me'))).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/calculate'))).toHaveLength(1);

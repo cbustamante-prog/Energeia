@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { SocialLogin } from '@capgo/capacitor-social-login';
@@ -54,19 +55,19 @@ async function nativeGoogleSignIn({ linking = false } = {}) {
   const response = await SocialLogin.login({
     provider: 'google',
     options: {
-      scopes: ['profile', 'email'],
       nonce,
       style: 'bottom',
       autoSelectEnabled: false,
       filterByAuthorizedAccounts: false,
     },
   });
-  if (response.responseType !== 'online' || !response.idToken) {
+  const loginResult = response?.result ?? response;
+  if (loginResult?.responseType !== 'online' || !loginResult?.idToken) {
     throw new Error('Google did not return a sign-in token. Please try again.');
   }
   return request(`${endpoint}/complete`, {
     method: 'POST',
-    body: { id_token: response.idToken, nonce },
+    body: { id_token: loginResult.idToken, nonce },
   });
 }
 
@@ -115,6 +116,7 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken, 
   const view = pathname === '/reset-password' ? 'reset' : pathname === '/register' ? 'register' : pathname === '/forgot-password' ? 'forgot' : 'login';
   const [registrationStep, setRegistrationStep] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [oauthProvider, setOAuthProvider] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -133,20 +135,32 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken, 
   }
 
   async function beginOAuth(provider) {
+    setOAuthProvider(provider);
     setLoading(true);
     setError('');
     try {
       if (provider === 'google' && Capacitor.getPlatform() === 'android') {
-        const result = await nativeGoogleSignIn();
-        localStorage.setItem('energeia_token', result.access_token);
-        onLogin(result.user);
-        return;
+        try {
+          const result = await nativeGoogleSignIn();
+          localStorage.setItem('energeia_token', result.access_token);
+          onLogin(result.user);
+          return;
+        } catch (exception) {
+          if (exception.message !== 'Google did not return a sign-in token. Please try again.') throw exception;
+          // The native Credential Manager can return no ID token when the
+          // installed APK's package/SHA-1 is not yet registered with Google.
+          // Keep sign-in usable through the configured OAuth web client.
+          const fallback = await request('/auth/oauth/google/start?native_app=true', { method: 'POST' });
+          window.location.assign(fallback.authorization_url);
+          return;
+        }
       }
       const nativeQuery = Capacitor.isNativePlatform() ? '?native_app=true' : '';
       const result = await request(`/auth/oauth/${provider}/start${nativeQuery}`, { method: 'POST' });
       window.location.assign(result.authorization_url);
     } catch (exception) {
       setError(exception.message);
+      setOAuthProvider('');
       setLoading(false);
     }
   }
@@ -227,10 +241,10 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken, 
           <div className="auth-welcome"><h1>{title}</h1></div>
           {!['forgot', 'reset'].includes(view) && <>
             <button className="social-auth-button" type="button" onClick={() => beginOAuth('google')} disabled={loading}>
-              <IonIcon aria-hidden="true" icon={logoGoogle} /> Continue with Google
+              {oauthProvider === 'google' ? <IonSpinner aria-hidden="true" name="crescent" /> : <IonIcon aria-hidden="true" icon={logoGoogle} />} {oauthProvider === 'google' ? 'Connecting to Google…' : 'Continue with Google'}
             </button>
             <button className="social-auth-button" type="button" onClick={() => beginOAuth('github')} disabled={loading}>
-              <IonIcon aria-hidden="true" icon={logoGithub} /> Continue with GitHub
+              {oauthProvider === 'github' ? <IonSpinner aria-hidden="true" name="crescent" /> : <IonIcon aria-hidden="true" icon={logoGithub} />} {oauthProvider === 'github' ? 'Connecting to GitHub…' : 'Continue with GitHub'}
             </button>
             <div className="auth-divider"><span>or</span></div>
           </>}
@@ -282,7 +296,39 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken, 
 }
 
 function Modal({ isOpen, onClose, title, subtitle, children, wide = false }) {
-  return <IonModal isOpen={isOpen} onDidDismiss={onClose} aria-label={title} className={wide ? 'app-modal app-modal-wide' : 'app-modal'}><div className="modal-body"><header className="modal-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><IonIcon aria-hidden="true" icon={closeOutline} /></button></header>{children}</div></IonModal>;
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setKeyboardOffset(0);
+      return undefined;
+    }
+
+    const viewport = window.visualViewport;
+    const updateKeyboardOffset = () => {
+      if (!viewport) return;
+      const visibleBottom = viewport.height + viewport.offsetTop;
+      setKeyboardOffset(Math.max(0, Math.round(window.innerHeight - visibleBottom)));
+    };
+
+    updateKeyboardOffset();
+    viewport?.addEventListener('resize', updateKeyboardOffset);
+    viewport?.addEventListener('scroll', updateKeyboardOffset);
+    return () => {
+      viewport?.removeEventListener('resize', updateKeyboardOffset);
+      viewport?.removeEventListener('scroll', updateKeyboardOffset);
+    };
+  }, [isOpen]);
+
+  return <IonModal
+    isOpen={isOpen}
+    onDidDismiss={onClose}
+    aria-label={title}
+    className={wide ? 'app-modal app-modal-wide' : 'app-modal'}
+    style={{ '--app-keyboard-offset': `${keyboardOffset}px` }}
+  >
+    <div className="modal-body"><header className="modal-heading"><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="icon-button modal-close" onClick={onClose} aria-label="Close"><IonIcon aria-hidden="true" icon={closeOutline} /></button></header>{children}</div>
+  </IonModal>;
 }
 
 function ModalForm({ children, onSubmit, button, note, busy, error }) {
@@ -424,6 +470,12 @@ function getInitialTheme() {
 function EnergiaApp() {
   const routerNavigate = useNavigate();
   const navigateRef = useRef(routerNavigate);
+  const nativePlatform = Capacitor.getPlatform();
+  const isMobileShell = nativePlatform !== 'web' || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+  useEffect(() => {
+    document.documentElement.dataset.nativePlatform = Capacitor.getPlatform();
+    return () => { delete document.documentElement.dataset.nativePlatform; };
+  }, []);
   useEffect(() => { navigateRef.current = routerNavigate; }, [routerNavigate]);
   const navigate = useCallback((...args) => navigateRef.current(...args), []);
   const location = useLocation();
@@ -463,6 +515,33 @@ function EnergiaApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [deviceFilter, setDeviceFilter] = useState('all');
   const currentHousehold = households.find((item) => item.household_id === Number(householdId));
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let listener;
+    let active = true;
+    CapacitorApp.addListener('backButton', () => {
+      if (menuOpen) {
+        setMenuOpen(false);
+      } else if (modal) {
+        setModal('');
+        setEditingHousehold(null);
+      } else if (user && location.pathname !== '/overview') {
+        navigate('/overview', { replace: true });
+      } else if (!user && ['/register', '/forgot-password', '/reset-password'].includes(location.pathname)) {
+        navigate('/login', { replace: true });
+      } else {
+        void CapacitorApp.exitApp();
+      }
+    }).then((registeredListener) => {
+      if (active) listener = registeredListener;
+      else void registeredListener.remove();
+    });
+    return () => {
+      active = false;
+      void listener?.remove();
+    };
+  }, [menuOpen, modal, user, location.pathname, navigate]);
 
   const toggleTheme = useCallback(() => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
@@ -1216,10 +1295,11 @@ function EnergiaApp() {
                       By category
                     </button>
                     <button
-                      className={`chip-pill${deviceFilter === 'sort' ? ' is-active' : ''}`}
-                      onClick={() => setDeviceFilter((p) => (p === 'sort' ? 'all' : 'sort'))}
+                      className={`chip-pill${deviceFilter.startsWith('sort-') ? ' is-active' : ''}`}
+                      aria-pressed={deviceFilter.startsWith('sort-')}
+                      onClick={() => setDeviceFilter((p) => p === 'sort-desc' ? 'sort-asc' : 'sort-desc')}
                     >
-                      Wattage: high to low <IonIcon aria-hidden="true" icon={chevronDownOutline} />
+                      Wattage: {deviceFilter === 'sort-asc' ? 'low to high' : 'high to low'} <IonIcon aria-hidden="true" icon={deviceFilter === 'sort-asc' ? arrowUpOutline : chevronDownOutline} />
                     </button>
                   </div>
 
@@ -1235,15 +1315,24 @@ function EnergiaApp() {
                       {appliances.length ? (
                         <div className="appliance-list">
                           {!appliances.some((item) => `${item.appliance_name} ${item.category}`.toLowerCase().includes(searchQuery.toLowerCase())) && <p role="status">No appliances match your search.</p>}
-                          {appliances.filter((item) => `${item.appliance_name} ${item.category}`.toLowerCase().includes(searchQuery.toLowerCase())).sort((a, b) => deviceFilter === 'sort' ? Number(b.wattage) - Number(a.wattage) : deviceFilter === 'category' ? (a.category || '').localeCompare(b.category || '') : a.appliance_id - b.appliance_id).map((appliance, index) => {
+                          {appliances.filter((item) => `${item.appliance_name} ${item.category}`.toLowerCase().includes(searchQuery.toLowerCase())).sort((a, b) => deviceFilter === 'sort-desc' ? Number(b.wattage) - Number(a.wattage) : deviceFilter === 'sort-asc' ? Number(a.wattage) - Number(b.wattage) : deviceFilter === 'category' ? (a.category || '').localeCompare(b.category || '') : a.appliance_id - b.appliance_id).map((appliance, index) => {
                             const applianceSchedules = schedules[appliance.appliance_id] || [];
                             const current = { current_kwh: Number(appliance.wattage) * Number(appliance.quantity) * Number(appliance.average_hours_per_day) * new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate() / 1000 };
                             const isHighUsage = Number(appliance.wattage) >= 1000 || appliance.category === 'Cooling';
 
                             return (
                               <article className="appliance-card" key={appliance.appliance_id}>
-                                <div className="appliance-head">
-                                  <span className={`appliance-icon appliance-icon-${index % 4}`}>
+                                <div
+                                  className="appliance-head"
+                                  style={isMobileShell ? {
+                                    display: 'grid',
+                                    gridTemplateColumns: '44px minmax(0, 1fr) 40px 40px',
+                                    gridTemplateAreas: '"icon name edit delete" "icon consumption consumption consumption"',
+                                    alignItems: 'center',
+                                    gap: '8px 10px',
+                                  } : undefined}
+                                >
+                                  <span className={`appliance-icon appliance-icon-${index % 4}`} style={isMobileShell ? { gridArea: 'icon' } : undefined}>
                                     <IonIcon aria-hidden="true"
                                       icon={
                                         appliance.category === 'Cooling'
@@ -1256,7 +1345,7 @@ function EnergiaApp() {
                                       }
                                     />
                                   </span>
-                                  <div className="appliance-name">
+                                  <div className="appliance-name" style={isMobileShell ? { gridArea: 'name', minWidth: 0, flex: 'none' } : undefined}>
                                     <div className="appliance-title-row">
                                       <h3>{appliance.appliance_name}</h3>
                                       <span className={`device-usage-badge ${isHighUsage ? 'badge-high' : 'badge-normal'}`}>
@@ -1268,7 +1357,7 @@ function EnergiaApp() {
                                       <span>·</span> {appliance.quantity} {Number(appliance.quantity) === 1 ? 'unit' : 'units'}
                                     </span>
                                   </div>
-                                  <div className="appliance-consumption">
+                                  <div className="appliance-consumption" style={isMobileShell ? { gridArea: 'consumption', display: 'flex', minWidth: 0, padding: 0, flex: 'none', flexDirection: 'row', alignItems: 'baseline', gap: '6px', textAlign: 'left' } : undefined}>
                                     <strong>
                                       {Number(current?.current_kwh) > 0 ? (
                                         <>
@@ -1278,10 +1367,11 @@ function EnergiaApp() {
                                         '—'
                                       )}
                                     </strong>
-                                    <span>{Number(current?.current_kwh) > 0 ? 'this billing period' : 'No active schedule'}</span>
+                                    <span style={isMobileShell ? { whiteSpace: 'nowrap', writingMode: 'horizontal-tb', wordBreak: 'normal' } : undefined}>{Number(current?.current_kwh) > 0 ? 'this billing period' : 'No active schedule'}</span>
                                   </div>
                                   <button
                                     className="icon-button"
+                                    style={isMobileShell ? { gridArea: 'edit' } : undefined}
                                     title="Edit appliance" aria-label={`Edit ${appliance.appliance_name}`}
                                     onClick={() => {
                                       setEditingAppliance(appliance);
@@ -1297,6 +1387,7 @@ function EnergiaApp() {
                                   </button>
                                   <button
                                     className="icon-button delete-button"
+                                    style={isMobileShell ? { gridArea: 'delete' } : undefined}
                                     title="Remove appliance" aria-label={`Remove ${appliance.appliance_name}`}
                                     onClick={() => deleteAppliance(appliance)}
                                   >
@@ -1770,23 +1861,38 @@ function EnergiaApp() {
             </div>
           </main>
 
-          <nav className="mobile-nav" aria-label="Main navigation">
-            {NAV.map((item) => (
-              <button
-                key={item.id}
-                className={`mobile-nav-item${page === item.id ? ' mobile-nav-item-active' : ''}`}
-                aria-current={page === item.id ? 'page' : undefined}
-                onClick={() => changePage(item.id)}
-              >
-                <div className="mobile-nav-pill">
-                  <IonIcon aria-hidden="true" icon={item.icon} />
-                </div>
-                <span>{item.mobileLabel}</span>
-              </button>
-            ))}
-          </nav>
         </div>
       </div>
+      {createPortal(
+        <nav
+          className="mobile-nav mobile-nav-portal"
+          aria-label="Main navigation"
+          style={{
+            display: 'grid',
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 'calc(48px + env(safe-area-inset-bottom))',
+            zIndex: 2147483647,
+            minHeight: '58px',
+          }}
+        >
+          {NAV.map((item) => (
+            <button
+              key={item.id}
+              className={`mobile-nav-item${page === item.id ? ' mobile-nav-item-active' : ''}`}
+              aria-current={page === item.id ? 'page' : undefined}
+              onClick={() => changePage(item.id)}
+            >
+              <div className="mobile-nav-pill">
+                <IonIcon aria-hidden="true" icon={item.icon} />
+              </div>
+              <span>{item.mobileLabel}</span>
+            </button>
+          ))}
+        </nav>,
+        document.body,
+      )}
       <IonToast isOpen={!!notice} message={notice} duration={3000} position="top" onDidDismiss={() => setNotice('')} />
 
       <Modal isOpen={modal === 'appliance'} onClose={() => setModal('')} title={editingAppliance ? 'Edit appliance' : 'Add appliance'} subtitle={editingAppliance ? 'Saved usage history will be preserved.' : 'Add a schedule after saving to estimate usage.'}>

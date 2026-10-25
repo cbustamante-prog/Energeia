@@ -232,6 +232,283 @@ ion-app.ion-page { color: var(--text); }
 .metric-card-primary>strong, .metric-card-primary>strong small { color: #fff; }
 .metric-card-primary>.metric-label, .metric-card-primary>.metric-note { color: #e5f1e9; }
 @media(max-width:360px) { .dashboard-metrics { grid-template-columns: minmax(0,1fr); } }
+
+/* Responsive guardrails for tablets and narrow phones. These rules are kept
+   here because this file is the final compatibility layer loaded by main.jsx. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 216px minmax(0, 1fr) !important;
+    max-width: none;
+    margin: 0;
+    border-radius: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .page-inner {
+    width: 100%;
+    padding: 24px clamp(20px, 4vw, 32px);
+  }
+
+  .dashboard-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-main-row,
+  .overview-bottom-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .topbar {
+    padding-inline: 20px;
+  }
+}
+
+@media (max-width: 860px) and (min-width: 768px) {
+  .auth-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auth-left {
+    display: none;
+  }
+
+  .auth-right {
+    min-height: 100dvh;
+    padding: 40px 24px;
+  }
+}
+
+@media (max-width: 380px) {
+  .page-inner {
+    padding-inline: 12px !important;
+  }
+
+  .mobile-nav-item > span {
+    font-size: 8px;
+    letter-spacing: -0.1px;
+  }
+
+  .mobile-nav-pill {
+    width: 34px;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Keep the navigation attached to the viewport, independent of the
+     scrolling app content and any Ionic page wrapper. */
+  .mobile-nav {
+    position: fixed !important;
+    inset: auto 0 0;
+    z-index: 1000;
+    min-height: 58px;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .appliance-head {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 40px 40px;
+    grid-template-areas:
+      "icon name edit delete"
+      "icon consumption consumption consumption";
+    align-items: center;
+    gap: 8px 10px;
+  }
+
+  .appliance-head > .appliance-icon { grid-area: icon; }
+  .appliance-head > .appliance-name { grid-area: name; min-width: 0; flex: none; }
+  .appliance-head > .appliance-consumption {
+    grid-area: consumption;
+    min-width: 0;
+    padding: 0;
+    flex: none;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    text-align: left;
+  }
+  .appliance-head > .appliance-consumption > span {
+    overflow-wrap: normal;
+    white-space: nowrap;
+  }
+  .appliance-head > .icon-button:first-of-type { grid-area: edit; }
+  .appliance-head > .delete-button { grid-area: delete; }
+}
+
+/* Some Android WebViews report a wider CSS viewport than their physical
+   screenshot width. Keep the mobile information architecture active through
+   tablet-sized CSS viewports instead of losing the app dock at the edge. */
+@media (max-width: 900px), (hover: none) and (pointer: coarse) {
+  .mobile-nav {
+    display: grid !important;
+    position: fixed !important;
+    inset: auto 0 0 !important;
+    z-index: 1000 !important;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .appliance-head {
+    display: grid !important;
+    grid-template-columns: 44px minmax(0, 1fr) 40px 40px;
+    grid-template-areas:
+      "icon name edit delete"
+      "icon consumption consumption consumption";
+    align-items: center;
+    gap: 8px 10px;
+  }
+
+  .appliance-head > .appliance-icon { grid-area: icon; }
+  .appliance-head > .appliance-name { grid-area: name; min-width: 0; flex: none; }
+  .appliance-head > .appliance-consumption {
+    grid-area: consumption;
+    display: flex;
+    min-width: 0;
+    padding: 0;
+    flex: none;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 6px;
+    text-align: left;
+  }
+  .appliance-head > .appliance-consumption > span {
+    max-width: 100%;
+    overflow: visible;
+    white-space: nowrap;
+    word-break: normal;
+    writing-mode: horizontal-tb;
+  }
+  .appliance-head > .icon-button:first-of-type { grid-area: edit; }
+  .appliance-head > .delete-button { grid-area: delete; }
+}
+
+/* Native Android is explicitly marked by App.jsx, so the dock does not rely
+   on the WebView reporting a particular CSS width. */
+html[data-native-platform="android"] .mobile-nav {
+  display: grid !important;
+  position: fixed !important;
+  inset: auto 0 0 !important;
+  z-index: 1000 !important;
+  min-height: 58px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+}
+
+html[data-native-platform="android"] .appliance-head {
+  display: grid !important;
+  grid-template-columns: 44px minmax(0, 1fr) 40px 40px;
+  grid-template-areas:
+    "icon name edit delete"
+    "icon consumption consumption consumption";
+  align-items: center;
+  gap: 8px 10px;
+}
+
+html[data-native-platform="android"] .appliance-head > .appliance-icon { grid-area: icon; }
+html[data-native-platform="android"] .appliance-head > .appliance-name { grid-area: name; min-width: 0; flex: none; }
+html[data-native-platform="android"] .appliance-head > .appliance-consumption {
+  grid-area: consumption;
+  display: flex;
+  min-width: 0;
+  padding: 0;
+  flex: none;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
+  text-align: left;
+}
+html[data-native-platform="android"] .appliance-head > .appliance-consumption > span {
+  max-width: 100%;
+  white-space: nowrap;
+  word-break: normal;
+  writing-mode: horizontal-tb;
+}
+html[data-native-platform="android"] .appliance-head > .icon-button:first-of-type { grid-area: edit; }
+html[data-native-platform="android"] .appliance-head > .delete-button { grid-area: delete; }
+
+/* Android WebView can place the app under the camera/status-bar cutout. The
+   portal nav is outside the Ionic scroller, so reserve space for both edges. */
+@media (hover: none) and (pointer: coarse) {
+  .shell-content {
+    padding-top: max(28px, env(safe-area-inset-top));
+    padding-bottom: 128px;
+  }
+
+  .mobile-nav-portal {
+    box-sizing: border-box;
+    padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Desktop pointer devices use the sidebar. Touch devices keep the portal dock
+   even when Android reports a tablet-sized CSS viewport. */
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .mobile-nav-portal { display: none !important; }
+}
+
+/* Registration is taller than the handset viewport. Let the document own
+   vertical scrolling so the second step and submit control stay reachable. */
+@media (max-width: 767px) {
+  html, body, #root { height: auto; min-height: 100%; overflow-y: auto; }
+  .auth-page {
+    display: block;
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
+    overscroll-behavior-y: auto;
+  }
+  .auth-right {
+    box-sizing: border-box;
+    min-height: 100svh;
+    height: auto;
+    overflow: visible;
+    padding-top: max(24px, env(safe-area-inset-top));
+    padding-bottom: calc(34px + env(safe-area-inset-bottom));
+  }
+  .auth-card { margin: 0 auto; }
+}
+
+/* Keep every Ionic form modal usable while the Android keyboard is open. */
+.app-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: 0;
+  --width: min(440px, calc(100% - 24px));
+  --height: min(680px, calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom))));
+  --max-height: calc(100dvh - max(24px, env(safe-area-inset-top)) - max(24px, env(safe-area-inset-bottom)));
+  --border-radius: 16px;
+  --overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 0 max(12px, env(safe-area-inset-bottom));
+}
+
+.app-modal::part(content) {
+  max-height: 100%;
+  transform: translateY(calc(var(--app-keyboard-offset, 0px) / -2));
+  transition: transform 160ms ease-out;
+}
+
+.app-modal .modal-body {
+  height: 100%;
+  max-height: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767px) {
+  .app-modal {
+    --width: calc(100% - 24px);
+    --height: min(680px, calc(100dvh - max(18px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom))));
+    --max-height: calc(100dvh - max(18px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
+    padding: max(9px, env(safe-area-inset-top)) 0 max(9px, env(safe-area-inset-bottom));
+  }
+
+  .app-modal .modal-body {
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+}
+
 .bill-table th { color: var(--text-muted); background: var(--surface-soft); }
 .bill-delta { color: var(--text); background: var(--surface-soft); }
 .empty-inline>div>strong { color: var(--text); }
