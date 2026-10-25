@@ -1,6 +1,7 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Capacitor } from '@capacitor/core';
 import App from './App.jsx';
 
 beforeEach(() => {
@@ -10,6 +11,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   window.localStorage.clear();
   delete document.documentElement.dataset.theme;
@@ -58,6 +60,14 @@ describe('Energeia', () => {
     expect(container.querySelector('.brand-image')?.getAttribute('src')).toBe('/energeia-logo.png');
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Continue with GitHub' })).toBeTruthy();
+  });
+
+  it('hides GitHub sign-in in the Android app', async () => {
+    vi.spyOn(Capacitor, 'getPlatform').mockReturnValue('android');
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'Continue with Google' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Continue with GitHub' })).toBeNull();
   });
 
   it('lets a visitor switch to account registration', async () => {
@@ -146,6 +156,8 @@ describe('Energeia', () => {
     await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe('Home'));
     await waitFor(() => expect(container.querySelector('.metric-card-primary strong')?.textContent).toContain('75.2'));
     expect(document.body.querySelectorAll('.mobile-nav-item')).toHaveLength(6);
+    expect(container.querySelectorAll('.nav-number')).toHaveLength(0);
+    expect(document.body.querySelector('.mobile-nav')?.getAttribute('style')).toContain('bottom: 0px');
 
     const menuButton = container.querySelector('.menu-toggle');
     expect(menuButton?.getAttribute('aria-expanded')).toBe('false');
@@ -154,6 +166,12 @@ describe('Energeia', () => {
     expect(container.querySelector('.sidebar')?.classList.contains('sidebar-open')).toBe(true);
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(menuButton?.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(container.querySelector('.add-device-pill-btn'));
+    expect(await screen.findByRole('heading', { name: 'Add appliance' })).toBeTruthy();
+    expect(document.body.querySelector('.mobile-nav')?.classList.contains('mobile-nav-hidden')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(document.body.querySelector('.mobile-nav')?.classList.contains('mobile-nav-hidden')).toBe(false));
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
     expect(document.documentElement.dataset.theme).toBe('dark');
@@ -165,7 +183,9 @@ describe('Energeia', () => {
       ['Account', 'Account settings'],
       ['Home', 'Home'],
     ]) {
-      fireEvent.click(screen.getByRole('button', { name: navLabel }));
+      const navButton = [...document.body.querySelectorAll('.mobile-nav-item')]
+        .find((button) => button.textContent.includes(navLabel));
+      fireEvent.click(navButton);
       await waitFor(() => expect(container.querySelector('.page-intro h1')?.textContent).toBe(heading));
       expect(document.documentElement.dataset.theme).toBe('dark');
       if (navLabel === 'Appliances') {

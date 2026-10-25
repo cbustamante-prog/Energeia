@@ -381,8 +381,77 @@ ion-app.ion-page { color: var(--text); }
   .appliance-head > .delete-button { grid-area: delete; }
 }
 
+/* Keep the native WebView's document as the scroll owner even if its CSS
+   viewport is tablet-sized and desktop Ionic layout rules would otherwise
+   clip the app shell. */
+html[data-native-platform="android"] {
+  height: auto !important;
+  min-height: 100%;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+html[data-native-platform="android"] body {
+  position: static !important;
+  width: 100%;
+  height: auto !important;
+  min-height: 100%;
+  overflow: visible !important;
+  transform: none !important;
+}
+
+html[data-native-platform="android"] ion-app.ion-page,
+html[data-native-platform="android"] #root,
+html[data-native-platform="android"] .shell-content,
+html[data-native-platform="android"] .app-shell,
+html[data-native-platform="android"] .main-pane {
+  height: auto !important;
+  min-height: 100dvh;
+  overflow: visible !important;
+}
+
+html[data-native-platform="android"] .app-shell {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom)) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-native-platform="android"] .sidebar {
+  position: fixed !important;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(290px, 86vw);
+  height: 100dvh;
+  z-index: 200;
+  transform: translateX(-105%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html[data-native-platform="android"] .sidebar.sidebar-open {
+  transform: translateX(0) !important;
+}
+
+html[data-native-platform="android"] .sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 199;
+}
+
 /* Native Android is explicitly marked by App.jsx, so the dock does not rely
    on the WebView reporting a particular CSS width. */
+html[data-native-platform="android"] .mobile-nav.mobile-nav-hidden,
+.mobile-nav.mobile-nav-hidden {
+  display: none !important;
+}
+
 html[data-native-platform="android"] .mobile-nav {
   display: grid !important;
   position: fixed !important;
@@ -482,18 +551,42 @@ html[data-native-platform="android"] .appliance-head > .delete-button { grid-are
 }
 
 .app-modal::part(content) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   max-height: 100%;
   transform: translateY(calc(var(--app-keyboard-offset, 0px) / -2));
   transition: transform 160ms ease-out;
 }
 
 .app-modal .modal-body {
+  box-sizing: border-box;
   height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
   max-height: none;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+
+html[data-native-platform="android"] .app-modal {
+  --height: min(680px, calc(100dvh - max(18px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom))));
+  --max-height: calc(100dvh - max(18px, env(safe-area-inset-top)) - max(18px, env(safe-area-inset-bottom)));
+}
+
+html[data-native-platform="android"] .app-modal::part(content) {
+  height: var(--height);
+  overflow: hidden;
+}
+
+html[data-native-platform="android"] .app-modal .modal-body {
+  max-height: 100%;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 
 @media (max-width: 767px) {

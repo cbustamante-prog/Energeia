@@ -243,9 +243,11 @@ function AuthScreen({ onLogin, darkMode, onToggleTheme, oauthError, resetToken, 
             <button className="social-auth-button" type="button" onClick={() => beginOAuth('google')} disabled={loading}>
               {oauthProvider === 'google' ? <IonSpinner aria-hidden="true" name="crescent" /> : <IonIcon aria-hidden="true" icon={logoGoogle} />} {oauthProvider === 'google' ? 'Connecting to Google…' : 'Continue with Google'}
             </button>
-            <button className="social-auth-button" type="button" onClick={() => beginOAuth('github')} disabled={loading}>
-              {oauthProvider === 'github' ? <IonSpinner aria-hidden="true" name="crescent" /> : <IonIcon aria-hidden="true" icon={logoGithub} />} {oauthProvider === 'github' ? 'Connecting to GitHub…' : 'Continue with GitHub'}
-            </button>
+            {Capacitor.getPlatform() !== 'android' && (
+              <button className="social-auth-button" type="button" onClick={() => beginOAuth('github')} disabled={loading}>
+                {oauthProvider === 'github' ? <IonSpinner aria-hidden="true" name="crescent" /> : <IonIcon aria-hidden="true" icon={logoGithub} />} {oauthProvider === 'github' ? 'Connecting to GitHub…' : 'Continue with GitHub'}
+              </button>
+            )}
             <div className="auth-divider"><span>or</span></div>
           </>}
           {registering && registrationStep === 2 && <div className="auth-progress" aria-label="Registration step 2 of 2">Step 2 of 2 · Home address</div>}
@@ -1088,14 +1090,13 @@ function EnergiaApp() {
             <div className="sidebar-nav-section">
               <span className="sidebar-section-title">MENU</span>
               <nav className="side-nav" aria-label="Main navigation">
-                {NAV.slice(0, 5).map((item, index) => (
+                {NAV.slice(0, 5).map((item) => (
                   <button
                     key={item.id}
                     aria-current={page === item.id ? 'page' : undefined}
                     className={`nav-link${page === item.id ? ' nav-link-active' : ''}`}
                     onClick={() => changePage(item.id)}
                   >
-                    <span className="nav-number">0{index + 1}</span>
                     <IonIcon aria-hidden="true" icon={item.icon} />
                     <span>{item.label}</span>
                     {page === item.id && <span className="nav-active-dot" />}
@@ -1112,7 +1113,6 @@ function EnergiaApp() {
                   className={`nav-link${page === 'settings' ? ' nav-link-active' : ''}`}
                   onClick={() => changePage('settings')}
                 >
-                  <span className="nav-number">06</span>
                   <IonIcon aria-hidden="true" icon={settingsOutline} />
                   <span>Account settings</span>
                   {page === 'settings' && <span className="nav-active-dot" />}
@@ -1865,15 +1865,14 @@ function EnergiaApp() {
       </div>
       {createPortal(
         <nav
-          className="mobile-nav mobile-nav-portal"
+          className={`mobile-nav mobile-nav-portal${modal ? ' mobile-nav-hidden' : ''}`}
           aria-label="Main navigation"
           style={{
-            display: 'grid',
             position: 'fixed',
             left: 0,
             right: 0,
-            bottom: 'calc(48px + env(safe-area-inset-bottom))',
-            zIndex: 2147483647,
+            bottom: 0,
+            zIndex: 1000,
             minHeight: '58px',
           }}
         >

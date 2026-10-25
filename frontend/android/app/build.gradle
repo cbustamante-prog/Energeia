@@ -1,5 +1,27 @@
 apply plugin: 'com.android.application'
 
+def releaseSigning = [
+    storeFile: System.getenv('ENERGEIA_RELEASE_KEYSTORE'),
+    storePassword: System.getenv('ENERGEIA_RELEASE_STORE_PASSWORD'),
+    keyAlias: System.getenv('ENERGEIA_RELEASE_KEY_ALIAS'),
+    keyPassword: System.getenv('ENERGEIA_RELEASE_KEY_PASSWORD'),
+]
+def releaseSigningConfigured = releaseSigning.values().every { it }
+
+gradle.taskGraph.whenReady { taskGraph ->
+    def releaseArtifactRequested = taskGraph.allTasks.any { task ->
+        task.project == project &&
+            task.name ==~ /(?i)(assemble|bundle|package|install|validateSigning)Release/
+    }
+    if (releaseArtifactRequested && !releaseSigningConfigured) {
+        throw new GradleException(
+            'Release signing is not configured. Set ENERGEIA_RELEASE_KEYSTORE, ' +
+                'ENERGEIA_RELEASE_STORE_PASSWORD, ENERGEIA_RELEASE_KEY_ALIAS, and ' +
+                'ENERGEIA_RELEASE_KEY_PASSWORD before building a release.'
+        )
+    }
+}
+
 android {
     namespace = "io.ionic.starter"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +29,8 @@ android {
         applicationId "io.ionic.starter"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
-        versionName "1.1.1"
+        versionCode 16
+        versionName "1.1.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,20 +38,29 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (releaseSigningConfigured) {
+                storeFile file(releaseSigning.storeFile)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
 }
 
-// Give every debug build a versioned filename so it is clear which APK is current.
+// Keep APK filenames aligned with the app version for debug and release builds.
 android.applicationVariants.all { variant ->
-    if (variant.buildType.name == 'debug') {
-        variant.outputs.all { output ->
-            output.outputFileName = "Energeia-v${variant.versionCode}.apk"
-        }
+    variant.outputs.all { output ->
+        output.outputFileName = "Energeia-v${variant.versionCode}.apk"
     }
 }
 

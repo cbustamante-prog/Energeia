@@ -4,7 +4,7 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 
 ## Features
 
-- Email/password registration and sign-in, Google/GitHub OAuth, profile completion, and password reset.
+- Email/password registration and sign-in, Google OAuth on web and Android, GitHub OAuth on web, profile completion, and password reset.
 - Private account profile and home-location settings; addresses are not shown on the dashboard.
 - Private, multiple household profiles and configurable electricity providers and rates.
 - Editable appliances and multiple active or paused schedules per appliance.
@@ -16,6 +16,23 @@ Energeia is an Ionic + React JavaScript web app with a FastAPI + Python backend 
 - Historical electricity-rate snapshots; appliances with history are archived instead of deleted.
 
 For existing database migrations and Google/GitHub, SMTP, and Vercel configuration, see [AUTH-SETUP.md](./AUTH-SETUP.md). OAuth credentials and SMTP secrets belong only in the FastAPI host environment, never in frontend or Vercel `VITE_*` variables.
+
+## Android app
+
+The Capacitor Android app is currently version **1.1.5 (version code 16)**. It supports Google sign-in and email/password authentication; GitHub sign-in is intentionally not shown in the Android app. The website continues to offer GitHub sign-in.
+
+Build a debug APK for device testing from PowerShell:
+
+```powershell
+cd frontend
+npm ci
+npm run build
+npx cap sync android
+cd android
+.\gradlew.bat assembleDebug
+```
+
+The APK is written to `frontend/android/app/build/outputs/apk/debug/Energeia-v16.apk`. Set `VITE_API_URL` to the deployed FastAPI API URL before building for a phone; the default `http://localhost:8000/api` is only suitable for local development. Google sign-in also requires the Google credentials and Android signing fingerprints described in [AUTH-SETUP.md](./AUTH-SETUP.md). Debug APKs are for testing, not Play Store releases; see [Android release signing](#android-release-signing) for signed release builds.
 
 ## Run locally with Supabase
 
@@ -123,3 +140,54 @@ registration and CRUD, planner calculations, navigation, overlays and scrolling.
 Run `npm run test.unit`, `npm run lint`, `npm run build`, and backend `uv run pytest`
 for the other checks. Real touchpad hardware, mobile keyboards and production OAuth
 still need device/provider checks after deployment.
+
+## Android release signing
+
+Release APKs and Play Store bundles must be signed with a private keystore. Keep
+the keystore and its passwords outside Git and back them up securely; losing the
+keystore can prevent updates to an already-published app. Do not share signing
+passwords in chat or commit them to the repository.
+
+Create a keystore once with `keytool` (it prompts for passwords):
+
+```powershell
+keytool -genkeypair -v -keystore "$HOME\energeia-release.jks" -alias energeia -keyalg RSA -keysize 4096 -validity 10000
+```
+
+Before building, set these environment variables in the same PowerShell session:
+
+```powershell
+$env:ENERGEIA_RELEASE_KEYSTORE = "$HOME\energeia-release.jks"
+$env:ENERGEIA_RELEASE_KEY_ALIAS = "energeia"
+foreach ($name in @("ENERGEIA_RELEASE_STORE_PASSWORD", "ENERGEIA_RELEASE_KEY_PASSWORD")) {
+  $secure = Read-Host -Prompt $name -AsSecureString
+  $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+  try {
+    [Environment]::SetEnvironmentVariable(
+      $name,
+      [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer),
+      "Process"
+    )
+  } finally {
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer)
+  }
+}
+```
+
+The Android Gradle build reads the signing values from the environment and fails
+release packaging if any value is missing. Do not put actual passwords in a
+checked-in file. Clear the password variables after building. From `frontend`,
+build either deliverable:
+
+```powershell
+npx cap sync android
+Set-Location android
+.\gradlew.bat assembleRelease
+.\gradlew.bat bundleRelease
+```
+
+The signed APK is written to
+`frontend/android/app/build/outputs/apk/release/app-release.apk`; the signed
+Android App Bundle for Google Play is written to
+`frontend/android/app/build/outputs/bundle/release/app-release.aab`. The
+existing debug APK is for testing and is not a store-release package.
